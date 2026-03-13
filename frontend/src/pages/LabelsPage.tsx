@@ -45,10 +45,14 @@ export function LabelsPage() {
   return (
     <div className="max-w-xl space-y-5">
       {/* Tabs */}
-      <div className="flex bg-slate-100 rounded-xl p-1 gap-1">
+      <div role="tablist" className="flex bg-slate-100 rounded-xl p-1 gap-1">
         {tabs.map(t => (
           <button
             key={t.id}
+            role="tab"
+            aria-selected={tab === t.id}
+            aria-controls={`tabpanel-${t.id}`}
+            id={`tab-${t.id}`}
             onClick={() => setTab(t.id)}
             className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-colors ${
               tab === t.id
@@ -67,7 +71,7 @@ export function LabelsPage() {
           title={tab === 'item' ? 'Print Item Label' : tab === 'location' ? 'Print Location Label' : 'Print Container Label'}
           subtitle="Preview and print a label"
         />
-        <div className="p-5 space-y-4">
+        <div role="tabpanel" id={`tabpanel-${tab}`} aria-labelledby={`tab-${tab}`} className="p-5 space-y-4">
           {tab === 'item' && (
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Select Item</label>

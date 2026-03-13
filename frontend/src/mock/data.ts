@@ -291,6 +291,7 @@ const electronics: ElectronicsSample[] = [
     requester: 'Ana Perez',
     externalLocationId: 'el1',
     externalLocationName: 'BMW Test Center',
+    expectedReturnDate: '2026-03-10',
     createdAt: '2025-11-01T10:00:00Z',
     updatedAt: '2026-02-28T08:00:00Z',
     createdById: 'u1',
@@ -342,6 +343,7 @@ const fixtures: Fixture[] = [
     productName: 'Generic Climatic Holder',
     externalLocationId: 'el2',
     externalLocationName: 'IDIADA Testing Lab',
+    expectedReturnDate: '2026-03-22',
     comment: 'On loan for IP67 water ingress tests',
     createdAt: '2025-09-01T08:00:00Z',
     updatedAt: '2026-03-01T08:00:00Z',
@@ -646,6 +648,10 @@ export const MOCK_STATS = {
     const days = (new Date(c.expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
     return days <= 30 && days >= 0
   }).length,
-  overdueReturns: 1, // item3 expected return was 2026-03-28 (mock overdue for demo)
+  overdueReturns: MOCK_ITEMS.filter(i =>
+    i.status === ItemStatus.TEMP_EXIT &&
+    i.expectedReturnDate != null &&
+    new Date(i.expectedReturnDate) < new Date()
+  ).length,
   recentOps: MOCK_OPERATIONS.slice(0, 5),
 }

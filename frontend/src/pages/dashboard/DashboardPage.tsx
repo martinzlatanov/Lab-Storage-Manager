@@ -140,7 +140,10 @@ export function DashboardPage() {
               <p className="text-slate-400 text-sm text-center py-8">No items currently at external locations</p>
             ) : (
               externalItems.map((item) => {
-                const isOverdue = item.id === 'item3' // mock overdue
+                const isOverdue =
+                  item.status === ItemStatus.TEMP_EXIT &&
+                  item.expectedReturnDate != null &&
+                  new Date(item.expectedReturnDate) < new Date()
                 return (
                   <Link
                     key={item.id}

@@ -95,12 +95,17 @@ function ItemSearchBox({ onSelect }: { onSelect?: (id: string) => void }) {
 export function ReceiptPage() {
   const [step, setStep] = useState(1)
   const [submitting, setSubmitting] = useState(false)
+  const [selectedItemId, setSelectedItemId] = useState('')
+  const [locationId, setLocationId] = useState('')
+  const [containerId, setContainerId] = useState('')
+  const [notes, setNotes] = useState('')
   const navigate = useNavigate()
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (step < 3) { setStep(s => s + 1); return }
     setSubmitting(true)
+    console.log('Receipt payload:', { selectedItemId, locationId, containerId, notes })
     setTimeout(() => { setSubmitting(false); navigate('/items') }, 1200)
   }
 
@@ -132,7 +137,7 @@ export function ReceiptPage() {
                   ))}
                   <div className="col-span-2">
                     <p className="text-xs text-slate-400 text-center my-2">— or search existing —</p>
-                    <ItemSearchBox />
+                    <ItemSearchBox onSelect={setSelectedItemId} />
                   </div>
                 </div>
               </>
@@ -142,7 +147,7 @@ export function ReceiptPage() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">Location <span className="text-red-500">*</span></label>
-                  <select className={inputClass}>
+                  <select value={locationId} onChange={e => setLocationId(e.target.value)} className={inputClass}>
                     <option value="">— Select location —</option>
                     <option value="l1">A-01-01-1 (Sofia / Main Building)</option>
                     <option value="l2">A-01-01-2 (Sofia / Main Building)</option>
@@ -152,7 +157,7 @@ export function ReceiptPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">Container (optional)</label>
-                  <select className={inputClass}>
+                  <select value={containerId} onChange={e => setContainerId(e.target.value)} className={inputClass}>
                     <option value="">— No container / new box —</option>
                     <option value="c1">BOX-0001</option>
                     <option value="c2">BOX-0002</option>
@@ -161,7 +166,7 @@ export function ReceiptPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">Notes</label>
-                  <textarea rows={2} placeholder="Received from supplier, delivery note #…" className={clsx(inputClass, 'resize-none')} />
+                  <textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Received from supplier, delivery note #…" className={clsx(inputClass, 'resize-none')} />
                 </div>
               </div>
             )}
@@ -205,6 +210,9 @@ export function ReceiptPage() {
 
 export function MovePage() {
   const [selectedItemId, setSelectedItemId] = useState('')
+  const [destLocationId, setDestLocationId] = useState('')
+  const [destContainerId, setDestContainerId] = useState('')
+  const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const navigate = useNavigate()
   const selectedItem = MOCK_ITEMS.find(i => i.id === selectedItemId)
@@ -212,6 +220,7 @@ export function MovePage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitting(true)
+    console.log('Move payload:', { selectedItemId, destLocationId, destContainerId, notes })
     setTimeout(() => { setSubmitting(false); navigate('/items') }, 1000)
   }
 
@@ -238,7 +247,7 @@ export function MovePage() {
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Destination Location <span className="text-red-500">*</span></label>
-            <select className={inputClass}>
+            <select value={destLocationId} onChange={e => setDestLocationId(e.target.value)} className={inputClass}>
               <option value="">— Select destination —</option>
               <option value="l1">A-01-01-1 (Sofia / Main Building)</option>
               <option value="l2">A-01-01-2 (Sofia / Main Building)</option>
@@ -251,17 +260,17 @@ export function MovePage() {
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Destination Container (optional)</label>
-            <select className={inputClass}>
+            <select value={destContainerId} onChange={e => setDestContainerId(e.target.value)} className={inputClass}>
               <option value="">— No container —</option>
-              <option>BOX-0001</option>
-              <option>BOX-0002</option>
-              <option>BOX-0006 (Munich)</option>
+              <option value="c1">BOX-0001</option>
+              <option value="c2">BOX-0002</option>
+              <option value="c6">BOX-0006 (Munich)</option>
             </select>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Notes</label>
-            <textarea rows={2} className={clsx(inputClass, 'resize-none')} placeholder="Reason for move…" />
+            <textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} className={clsx(inputClass, 'resize-none')} placeholder="Reason for move…" />
           </div>
 
           <div className="flex justify-end gap-3 pt-2">
@@ -280,12 +289,17 @@ export function MovePage() {
 // ─── Temp Exit ────────────────────────────────────────────────────────────────
 
 export function ExitPage() {
+  const [selectedItemId, setSelectedItemId] = useState('')
+  const [externalLocationId, setExternalLocationId] = useState('')
+  const [expectedReturnDate, setExpectedReturnDate] = useState('')
+  const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const navigate = useNavigate()
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitting(true)
+    console.log('Exit payload:', { selectedItemId, externalLocationId, expectedReturnDate, notes })
     setTimeout(() => { setSubmitting(false); navigate('/items') }, 1000)
   }
 
@@ -299,11 +313,11 @@ export function ExitPage() {
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Item <span className="text-red-500">*</span></label>
-            <ItemSearchBox />
+            <ItemSearchBox onSelect={setSelectedItemId} />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">External Location <span className="text-red-500">*</span></label>
-            <select className={inputClass}>
+            <select value={externalLocationId} onChange={e => setExternalLocationId(e.target.value)} className={inputClass}>
               <option value="">— Select external location —</option>
               <option value="el1">BMW Test Center (Munich, Germany)</option>
               <option value="el2">IDIADA Testing Lab (Santa Oliva, Spain)</option>
@@ -312,11 +326,11 @@ export function ExitPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Expected Return Date <span className="text-red-500">*</span></label>
-            <input type="date" className={inputClass} min={new Date().toISOString().split('T')[0]} />
+            <input type="date" value={expectedReturnDate} onChange={e => setExpectedReturnDate(e.target.value)} className={inputClass} min={new Date().toISOString().split('T')[0]} />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Notes</label>
-            <textarea rows={2} className={clsx(inputClass, 'resize-none')} placeholder="Purpose of exit, contact person…" />
+            <textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} className={clsx(inputClass, 'resize-none')} placeholder="Purpose of exit, contact person…" />
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <Link to="/" className="px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 hover:bg-slate-50">Cancel</Link>
@@ -335,15 +349,22 @@ export function ExitPage() {
 
 export function ReturnPage() {
   const [selectedItemId, setSelectedItemId] = useState('')
+  const [returnLocationId, setReturnLocationId] = useState('')
+  const [returnContainerId, setReturnContainerId] = useState('')
+  const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const navigate = useNavigate()
 
   const selectedItem = MOCK_ITEMS.find(i => i.id === selectedItemId)
-  const isOverdue = selectedItem?.id === 'item3' // mock
+  const isOverdue =
+    selectedItem?.status === ItemStatus.TEMP_EXIT &&
+    selectedItem?.expectedReturnDate != null &&
+    new Date(selectedItem.expectedReturnDate) < new Date()
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitting(true)
+    console.log('Return payload:', { selectedItemId, returnLocationId, returnContainerId, notes })
     setTimeout(() => { setSubmitting(false); navigate('/items') }, 1000)
   }
 
@@ -374,7 +395,7 @@ export function ReturnPage() {
             <>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Assign to Location <span className="text-red-500">*</span></label>
-                <select className={inputClass}>
+                <select value={returnLocationId} onChange={e => setReturnLocationId(e.target.value)} className={inputClass}>
                   <option value="">— Select storage location —</option>
                   <option value="l1">A-01-01-1 (Sofia / Main Building)</option>
                   <option value="l2">A-01-01-2 (Sofia / Main Building)</option>
@@ -383,15 +404,15 @@ export function ReturnPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Container (optional)</label>
-                <select className={inputClass}>
+                <select value={returnContainerId} onChange={e => setReturnContainerId(e.target.value)} className={inputClass}>
                   <option value="">— No container —</option>
-                  <option>BOX-0001</option>
-                  <option>BOX-0002</option>
+                  <option value="c1">BOX-0001</option>
+                  <option value="c2">BOX-0002</option>
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Notes</label>
-                <textarea rows={2} className={clsx(inputClass, 'resize-none')} placeholder="Condition notes, delay reason…" />
+                <textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} className={clsx(inputClass, 'resize-none')} placeholder="Condition notes, delay reason…" />
               </div>
             </>
           )}
@@ -413,6 +434,7 @@ export function ReturnPage() {
 
 export function ScrapPage() {
   const [selectedItemId, setSelectedItemId] = useState('')
+  const [scrapReason, setScrapReason] = useState('')
   const [confirmed, setConfirmed] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const navigate = useNavigate()
@@ -423,6 +445,7 @@ export function ScrapPage() {
     e.preventDefault()
     if (!confirmed) return
     setSubmitting(true)
+    console.log('Scrap payload:', { selectedItemId, scrapReason })
     setTimeout(() => { setSubmitting(false); navigate('/items') }, 1000)
   }
 
@@ -452,7 +475,7 @@ export function ScrapPage() {
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Reason for Scrap <span className="text-red-500">*</span></label>
-            <textarea rows={3} className={clsx(inputClass, 'resize-none')} placeholder="Describe the reason for scrapping (damage, EOL, failed test…)" />
+            <textarea rows={3} value={scrapReason} onChange={e => setScrapReason(e.target.value)} className={clsx(inputClass, 'resize-none')} placeholder="Describe the reason for scrapping (damage, EOL, failed test…)" />
           </div>
 
           {selectedItem && (
@@ -502,6 +525,7 @@ export function ConsumePage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitting(true)
+    console.log('Consume payload:', { selectedItemId, qty })
     setTimeout(() => { setSubmitting(false); navigate('/items') }, 1000)
   }
 
@@ -574,7 +598,7 @@ export function ConsumePage() {
             <Link to="/" className="px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 hover:bg-slate-50">Cancel</Link>
             <button
               type="submit"
-              disabled={!selectedItem || !qty || isNaN(qtyNum) || qtyNum <= 0 || submitting}
+              disabled={!selectedItem || !qty || isNaN(qtyNum) || qtyNum <= 0 || qtyNum > (selectedItem?.quantity ?? 0) || submitting}
               className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors"
             >
               {submitting ? <><Loader2 size={14} className="animate-spin" /> Processing…</> : 'Confirm Consume'}

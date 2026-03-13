@@ -1,0 +1,18 @@
+import { PrismaClient } from "@prisma/client";
+
+// Singleton — reuse one PrismaClient instance across the app.
+// In development, prevent hot-reload from spawning multiple connections.
+const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+
+export const prisma =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    log:
+      process.env.NODE_ENV === "development"
+        ? ["query", "warn", "error"]
+        : ["warn", "error"],
+  });
+
+if (process.env.NODE_ENV !== "production") {
+  globalForPrisma.prisma = prisma;
+}

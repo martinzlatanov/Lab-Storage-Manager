@@ -320,7 +320,9 @@ export function ExternalLocationsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
         {MOCK_EXTERNAL_LOCATIONS.map(ext => {
           const itemsHere = externalItems.filter(i => i.externalLocationId === ext.id)
-          const overdueCount = itemsHere.filter(i => i.id === 'item3').length // mock
+          const overdueCount = itemsHere.filter(i =>
+            i.expectedReturnDate != null && new Date(i.expectedReturnDate) < new Date()
+          ).length
 
           return (
             <Card key={ext.id}>
@@ -378,7 +380,7 @@ export function ExternalLocationsPage() {
                 ) : (
                   <div className="space-y-1.5">
                     {itemsHere.map(item => {
-                      const isOverdue = item.id === 'item3'
+                      const isOverdue = item.expectedReturnDate != null && new Date(item.expectedReturnDate) < new Date()
                       return (
                         <Link
                           key={item.id}

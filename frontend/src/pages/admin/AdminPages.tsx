@@ -33,6 +33,7 @@ function RoleBadge({ role }: { role: UserRole }) {
 
 export function UserManagementPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingRole, setEditingRole] = useState<UserRole>(UserRole.USER)
 
   return (
     <div className="space-y-5 max-w-4xl">
@@ -72,10 +73,14 @@ export function UserManagementPage() {
                   </td>
                   <td className="px-5 py-3.5">
                     {editingId === user.id ? (
-                      <select className="border border-slate-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <select
+                        value={editingRole}
+                        onChange={e => setEditingRole(e.target.value as UserRole)}
+                        className="border border-slate-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
                         <option value={UserRole.VIEWER}>Viewer</option>
-                        <option value={UserRole.USER} selected={user.role === UserRole.USER}>User</option>
-                        <option value={UserRole.ADMIN} selected={user.role === UserRole.ADMIN}>Admin</option>
+                        <option value={UserRole.USER}>User</option>
+                        <option value={UserRole.ADMIN}>Admin</option>
                       </select>
                     ) : (
                       <RoleBadge role={user.role} />
@@ -94,7 +99,7 @@ export function UserManagementPage() {
                     <div className="flex items-center gap-1">
                       {editingId === user.id ? (
                         <>
-                          <button onClick={() => setEditingId(null)}
+                          <button onClick={() => { console.log('Save role:', { userId: user.id, role: editingRole }); setEditingId(null) }}
                             className="flex items-center gap-1 px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs transition-colors">
                             <Save size={11} /> Save
                           </button>
@@ -105,7 +110,7 @@ export function UserManagementPage() {
                         </>
                       ) : (
                         <>
-                          <button onClick={() => setEditingId(user.id)}
+                          <button onClick={() => { setEditingId(user.id); setEditingRole(user.role) }}
                             className="flex items-center gap-1 px-2.5 py-1 border border-slate-200 text-slate-600 rounded-lg text-xs hover:bg-slate-50 transition-colors">
                             <Pencil size={11} /> Edit
                           </button>

@@ -40,7 +40,9 @@ All parts must be locatable at any time. Every movement is tracked and recorded 
 | Label Printers | Zebra / Citizen / Brother (abstracted print service) |
 
 ---
-
+## Module Design 
+  - Use modular code organization with clear separation of components, and features. For example, separate frontend components, backend logic, and database schema into distinct directories.
+  
 ## Item Types Tracked
 
 1. **Automotive Electronics Test Samples** — clusters, displays, body controllers, etc.

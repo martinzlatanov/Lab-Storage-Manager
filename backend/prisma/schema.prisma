@@ -1,0 +1,314 @@
+// ─── Prisma Schema ────────────────────────────────────────────────────────────
+// Lab Storage Manager
+// Source of truth for the database structure.
+// Run `npx prisma migrate dev` to apply changes.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  ADMIN
+  USER
+  VIEWER
+}
+
+enum ItemType {
+  ELECTRONICS_SAMPLE
+  FIXTURE
+  SPARE_PART
+  CONSUMABLE
+  MISC
+}
+
+enum FixtureCategory {
+  VIBRATION
+  MECHANICAL_SHOCK
+  CLIMATIC
+  DUST
+  SALT
+  WATER
+  OTHER
+}
+
+enum DevelopmentPhase {
+  PRE_DV
+  DV
+  PV
+}
+
+enum ItemStatus {
+  IN_STORAGE
+  TEMP_EXIT
+  SCRAPPED
+  DEPLETED // consumables only
+}
+
+enum OperationType {
+  RECEIPT
+  MOVE
+  TEMP_EXIT
+  RETURN
+  SCRAP
+  CONSUME
+}
+
+// ─── Users ────────────────────────────────────────────────────────────────────
+
+model User {
+  id            String   @id @default(cuid())
+  ldapUsername  String   @unique
+  displayName   String
+  email         String   @unique
+  role          UserRole @default(USER)
+  isActive      Boolean  @default(true)
+
+  // Optional home-site association (admins may be global)
+  siteId        String?
+  site          Site?    @relation(fields: [siteId], references: [id])
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  createdItems  Item[]            @relation("CreatedBy")
+  operations    OperationRecord[] @relation("PerformedBy")
+  refreshTokens RefreshToken[]
+
+  @@index([ldapUsername])
+  @@index([isActive])
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([token])
+  @@index([userId])
+}
+
+// ─── Storage Hierarchy ────────────────────────────────────────────────────────
+// Site → Building → StorageArea → StorageLocation
+
+model Site {
+  id        String     @id @default(cuid())
+  name      String     @unique  // e.g. "Sofia", "Munich", "Paris"
+  createdAt DateTime   @default(now())
+
+  buildings Building[]
+  users     User[]
+}
+
+model Building {
+  id        String        @id @default(cuid())
+  name      String                          // e.g. "Main building", "Lab building"
+  siteId    String
+  site      Site          @relation(fields: [siteId], references: [id])
+  createdAt DateTime      @default(now())
+
+  storageAreas StorageArea[]
+
+  @@unique([siteId, name])                  // same name can exist in different sites
+}
+
+model StorageArea {
+  id         String          @id @default(cuid())
+  code       String                            // e.g. "A", "B", "C"
+  buildingId String
+  building   Building        @relation(fields: [buildingId], references: [id])
+  createdAt  DateTime        @default(now())
+
+  locations StorageLocation[]
+
+  @@unique([buildingId, code])               // same code can exist in different buildings
+}
+
+model StorageLocation {
+  id            String      @id @default(cuid())
+  storageAreaId String
+  storageArea   StorageArea @relation(fields: [storageAreaId], references: [id])
+  row           String                          // e.g. "01"
+  shelf         String                          // e.g. "02"
+  level         String                          // e.g. "5"
+  // Computed label stored for fast display/search: "A-01-02-5"
+  label         String
+  createdAt     DateTime    @default(now())
+
+  items           Item[]
+  containers      Container[]
+  fromOperations  OperationRecord[] @relation("FromLocation")
+  toOperations    OperationRecord[] @relation("ToLocation")
+
+  @@unique([storageAreaId, row, shelf, level])
+  @@index([label])
+}
+
+// ─── External Locations ───────────────────────────────────────────────────────
+
+model ExternalLocation {
+  id            String  @id @default(cuid())
+  name          String                      // e.g. "BMW Munich R&D", "IDIADA"
+  contactPerson String
+  address       String
+  city          String
+  country       String?
+  phone         String?
+  email         String?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  items           Item[]
+  containers      Container[]
+  fromOperations  OperationRecord[] @relation("FromExternal")
+  toOperations    OperationRecord[] @relation("ToExternal")
+}
+
+// ─── Containers / Boxes ───────────────────────────────────────────────────────
+
+model Container {
+  id       String  @id @default(cuid())
+  barcode  String  @unique          // scanned value (Code 128)
+  label    String                   // human-readable label
+  notes    String?
+
+  // A container is either at an internal location or an external one
+  locationId         String?
+  location           StorageLocation? @relation(fields: [locationId], references: [id])
+  externalLocationId String?
+  externalLocation   ExternalLocation? @relation(fields: [externalLocationId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items               Item[]
+  fromContainerOps    OperationRecord[] @relation("FromContainer")
+  toContainerOps      OperationRecord[] @relation("ToContainer")
+}
+
+// ─── Items ────────────────────────────────────────────────────────────────────
+// Single table — itemType discriminates which nullable fields are relevant.
+
+model Item {
+  id          String     @id @default(cuid())
+  barcode     String     @unique          // Code 128 scan value
+  itemType    ItemType
+  status      ItemStatus @default(IN_STORAGE)
+  labIdNumber String                      // mandatory on all types
+  comment     String?
+
+  // Location: item is in a container OR at a direct location OR at external location
+  containerId        String?
+  container          Container?        @relation(fields: [containerId], references: [id])
+  locationId         String?
+  location           StorageLocation?  @relation(fields: [locationId], references: [id])
+  externalLocationId String?
+  externalLocation   ExternalLocation? @relation(fields: [externalLocationId], references: [id])
+
+  createdById String
+  createdBy   User      @relation("CreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // ── Electronics Sample fields ─────────────────────────────────────────────
+  oem               String?
+  productName       String?
+  productType       String?
+  oemPartNumber     String?
+  serialNumber      String?
+  developmentPhase  DevelopmentPhase?
+  plantLocation     String?
+  testRequestNumber String?
+  requester         String?
+
+  // ── Fixture fields ────────────────────────────────────────────────────────
+  // fixtureCategories stored as a simple array (PostgreSQL native)
+  fixtureCategories FixtureCategory[]
+  pictureUrl        String?
+
+  // ── Spare Part fields ─────────────────────────────────────────────────────
+  manufacturer  String?
+  model         String?
+  partType      String?
+  variant       String?
+  forMachines   String[]              // e.g. ["TH710-W5", "TS130"]
+
+  // ── Consumable fields ─────────────────────────────────────────────────────
+  // manufacturer + model shared with spare parts
+  consumableType    String?
+  quantity          Float?
+  unit              String?           // "kg", "L", "pcs"
+  lotNumber         String?
+  expiryDate        DateTime?
+  shelfLifeMonths   Int?
+
+  // ── Misc fields ───────────────────────────────────────────────────────────
+  miscName        String?
+  miscDescription String?
+
+  // Relations
+  operations OperationRecord[]
+
+  @@index([itemType])
+  @@index([status])
+  @@index([barcode])
+  @@index([labIdNumber])
+  @@index([testRequestNumber])
+  @@index([locationId])
+  @@index([containerId])
+}
+
+// ─── Operations (Audit Log) ───────────────────────────────────────────────────
+// Every record is immutable — never updated or deleted.
+
+model OperationRecord {
+  id            String        @id @default(cuid())
+  operationType OperationType
+  itemId        String
+  item          Item          @relation(fields: [itemId], references: [id])
+  performedById String
+  performedBy   User          @relation("PerformedBy", fields: [performedById], references: [id])
+  performedAt   DateTime      @default(now())
+  notes         String?
+
+  // Location movement
+  fromLocationId String?
+  fromLocation   StorageLocation? @relation("FromLocation", fields: [fromLocationId], references: [id])
+  toLocationId   String?
+  toLocation     StorageLocation? @relation("ToLocation", fields: [toLocationId], references: [id])
+
+  // Container movement
+  fromContainerId String?
+  fromContainer   Container? @relation("FromContainer", fields: [fromContainerId], references: [id])
+  toContainerId   String?
+  toContainer     Container? @relation("ToContainer", fields: [toContainerId], references: [id])
+
+  // External location movement
+  fromExternalLocationId String?
+  fromExternalLocation   ExternalLocation? @relation("FromExternal", fields: [fromExternalLocationId], references: [id])
+  toExternalLocationId   String?
+  toExternalLocation     ExternalLocation? @relation("ToExternal", fields: [toExternalLocationId], references: [id])
+
+  // TEMP_EXIT specific
+  expectedReturnDate DateTime?
+
+  // CONSUME specific
+  quantityConsumed Float?
+
+  @@index([itemId])
+  @@index([performedById])
+  @@index([performedAt])
+  @@index([operationType])
+}

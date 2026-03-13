@@ -7,6 +7,8 @@ import clsx from 'clsx'
 
 type ItemFormType = 'electronics' | 'fixture' | 'sparepart' | 'consumable' | 'misc'
 
+const VALID_TYPES: ItemFormType[] = ['electronics', 'fixture', 'sparepart', 'consumable', 'misc']
+
 const FORM_TITLES: Record<ItemFormType, string> = {
   electronics: 'Add Electronics Sample',
   fixture: 'Add Fixture',
@@ -41,32 +43,35 @@ function FormField({
 const inputClass =
   'w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition bg-white'
 
-function ElectronicsForm() {
+function ElectronicsForm({ fields, setField }: {
+  fields: Record<string, string>
+  setField: (name: string, value: string) => void
+}) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
       <FormField label="OEM" required>
-        <input type="text" placeholder="BMW, RSA, MB, STLA…" className={inputClass} />
+        <input type="text" name="oem" value={fields.oem ?? ''} onChange={e => setField('oem', e.target.value)} placeholder="BMW, RSA, MB, STLA…" className={inputClass} />
       </FormField>
       <FormField label="Product Type" required>
-        <input type="text" placeholder="Cluster, CID, HUD, BDC…" className={inputClass} />
+        <input type="text" name="productType" value={fields.productType ?? ''} onChange={e => setField('productType', e.target.value)} placeholder="Cluster, CID, HUD, BDC…" className={inputClass} />
       </FormField>
       <FormField label="Product Name" required>
-        <input type="text" placeholder="BR206 CID" className={inputClass} />
+        <input type="text" name="productName" value={fields.productName ?? ''} onChange={e => setField('productName', e.target.value)} placeholder="BR206 CID" className={inputClass} />
       </FormField>
       <FormField label="OEM Part Number" required>
-        <input type="text" placeholder="A 01 01 205" className={clsx(inputClass, 'font-mono')} />
+        <input type="text" name="oemPartNumber" value={fields.oemPartNumber ?? ''} onChange={e => setField('oemPartNumber', e.target.value)} placeholder="A 01 01 205" className={clsx(inputClass, 'font-mono')} />
       </FormField>
       <FormField label="Test Request Number" required>
-        <input type="text" placeholder="TR.EL26.012345" className={clsx(inputClass, 'font-mono')} />
+        <input type="text" name="testRequestNumber" value={fields.testRequestNumber ?? ''} onChange={e => setField('testRequestNumber', e.target.value)} placeholder="TR.EL26.012345" className={clsx(inputClass, 'font-mono')} />
       </FormField>
       <FormField label="Lab ID Number" required hint="Auto-generated or enter manually">
-        <input type="text" placeholder="TR.EL26.012345.1.1" className={clsx(inputClass, 'font-mono')} />
+        <input type="text" name="labIdNumber" value={fields.labIdNumber ?? ''} onChange={e => setField('labIdNumber', e.target.value)} placeholder="TR.EL26.012345.1.1" className={clsx(inputClass, 'font-mono')} />
       </FormField>
       <FormField label="Serial Number">
-        <input type="text" placeholder="SN-2026-001" className={clsx(inputClass, 'font-mono')} />
+        <input type="text" name="serialNumber" value={fields.serialNumber ?? ''} onChange={e => setField('serialNumber', e.target.value)} placeholder="SN-2026-001" className={clsx(inputClass, 'font-mono')} />
       </FormField>
       <FormField label="Development Phase">
-        <select className={inputClass}>
+        <select name="developmentPhase" value={fields.developmentPhase ?? ''} onChange={e => setField('developmentPhase', e.target.value)} className={inputClass}>
           <option value="">— Select —</option>
           {Object.entries(DEV_PHASE_LABELS).map(([v, l]) => (
             <option key={v} value={v}>{l}</option>
@@ -74,36 +79,39 @@ function ElectronicsForm() {
         </select>
       </FormField>
       <FormField label="Plant Location">
-        <input type="text" placeholder="Regensburg, Palmela, Namestovo…" className={inputClass} />
+        <input type="text" name="plantLocation" value={fields.plantLocation ?? ''} onChange={e => setField('plantLocation', e.target.value)} placeholder="Regensburg, Palmela, Namestovo…" className={inputClass} />
       </FormField>
       <FormField label="Requester">
-        <input type="text" placeholder="Name or Company ID" className={inputClass} />
+        <input type="text" name="requester" value={fields.requester ?? ''} onChange={e => setField('requester', e.target.value)} placeholder="Name or Company ID" className={inputClass} />
       </FormField>
       <div className="col-span-full">
         <FormField label="Comment">
-          <textarea rows={2} placeholder="Optional notes…" className={clsx(inputClass, 'resize-none')} />
+          <textarea name="comment" rows={2} value={fields.comment ?? ''} onChange={e => setField('comment', e.target.value)} placeholder="Optional notes…" className={clsx(inputClass, 'resize-none')} />
         </FormField>
       </div>
     </div>
   )
 }
 
-function FixtureForm() {
-  const [selectedTypes, setSelectedTypes] = useState<FixtureType[]>([])
-
+function FixtureForm({ fields, setField, selectedTypes, setSelectedTypes }: {
+  fields: Record<string, string>
+  setField: (name: string, value: string) => void
+  selectedTypes: FixtureType[]
+  setSelectedTypes: (types: FixtureType[]) => void
+}) {
   function toggleType(ft: FixtureType) {
-    setSelectedTypes((prev) =>
-      prev.includes(ft) ? prev.filter((t) => t !== ft) : [...prev, ft],
+    setSelectedTypes(
+      selectedTypes.includes(ft) ? selectedTypes.filter((t) => t !== ft) : [...selectedTypes, ft],
     )
   }
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
       <FormField label="Product Name" required>
-        <input type="text" placeholder="BR206 CID Vib Fixture" className={inputClass} />
+        <input type="text" name="productName" value={fields.productName ?? ''} onChange={e => setField('productName', e.target.value)} placeholder="BR206 CID Vib Fixture" className={inputClass} />
       </FormField>
       <FormField label="Lab ID Number" required>
-        <input type="text" placeholder="432, 1236, 3256…" className={clsx(inputClass, 'font-mono')} />
+        <input type="text" name="labIdNumber" value={fields.labIdNumber ?? ''} onChange={e => setField('labIdNumber', e.target.value)} placeholder="432, 1236, 3256…" className={clsx(inputClass, 'font-mono')} />
       </FormField>
 
       <div className="col-span-full">
@@ -139,99 +147,108 @@ function FixtureForm() {
 
       <div className="col-span-full">
         <FormField label="Comment">
-          <textarea rows={2} placeholder="Optional notes…" className={clsx(inputClass, 'resize-none')} />
+          <textarea name="comment" rows={2} value={fields.comment ?? ''} onChange={e => setField('comment', e.target.value)} placeholder="Optional notes…" className={clsx(inputClass, 'resize-none')} />
         </FormField>
       </div>
     </div>
   )
 }
 
-function SparePartForm() {
+function SparePartForm({ fields, setField }: {
+  fields: Record<string, string>
+  setField: (name: string, value: string) => void
+}) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
       <FormField label="Manufacturer" required>
-        <input type="text" placeholder="ETS Solutions, Danfoss…" className={inputClass} />
+        <input type="text" name="manufacturer" value={fields.manufacturer ?? ''} onChange={e => setField('manufacturer', e.target.value)} placeholder="ETS Solutions, Danfoss…" className={inputClass} />
       </FormField>
       <FormField label="Model" required>
-        <input type="text" placeholder="OP-31, X-522…" className={clsx(inputClass, 'font-mono')} />
+        <input type="text" name="model" value={fields.model ?? ''} onChange={e => setField('model', e.target.value)} placeholder="OP-31, X-522…" className={clsx(inputClass, 'font-mono')} />
       </FormField>
       <FormField label="Type" required>
-        <input type="text" placeholder="Compressor, Valve, Fan…" className={inputClass} />
+        <input type="text" name="sparePartType" value={fields.sparePartType ?? ''} onChange={e => setField('sparePartType', e.target.value)} placeholder="Compressor, Valve, Fan…" className={inputClass} />
       </FormField>
       <FormField label="Variant">
-        <input type="text" placeholder="Single phase, 3-phase, 7 bar…" className={inputClass} />
+        <input type="text" name="variant" value={fields.variant ?? ''} onChange={e => setField('variant', e.target.value)} placeholder="Single phase, 3-phase, 7 bar…" className={inputClass} />
       </FormField>
       <FormField label="Lab ID Number" required>
-        <input type="text" placeholder="SP-2025-0011" className={clsx(inputClass, 'font-mono')} />
+        <input type="text" name="labIdNumber" value={fields.labIdNumber ?? ''} onChange={e => setField('labIdNumber', e.target.value)} placeholder="SP-2025-0011" className={clsx(inputClass, 'font-mono')} />
       </FormField>
       <FormField label="For Machines">
-        <input type="text" placeholder="TH710-W5, TS130 (comma-separated)" className={inputClass} />
+        <input type="text" name="forMachines" value={fields.forMachines ?? ''} onChange={e => setField('forMachines', e.target.value)} placeholder="TH710-W5, TS130 (comma-separated)" className={inputClass} />
       </FormField>
       <div className="col-span-full">
         <FormField label="Comment">
-          <textarea rows={2} placeholder="Optional notes…" className={clsx(inputClass, 'resize-none')} />
+          <textarea name="comment" rows={2} value={fields.comment ?? ''} onChange={e => setField('comment', e.target.value)} placeholder="Optional notes…" className={clsx(inputClass, 'resize-none')} />
         </FormField>
       </div>
     </div>
   )
 }
 
-function ConsumableForm() {
+function ConsumableForm({ fields, setField }: {
+  fields: Record<string, string>
+  setField: (name: string, value: string) => void
+}) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
       <FormField label="Manufacturer" required>
-        <input type="text" placeholder="Valerus, Hydratek…" className={inputClass} />
+        <input type="text" name="manufacturer" value={fields.manufacturer ?? ''} onChange={e => setField('manufacturer', e.target.value)} placeholder="Valerus, Hydratek…" className={inputClass} />
       </FormField>
       <FormField label="Model" required>
-        <input type="text" placeholder="MBR-200, pH7-Solution…" className={inputClass} />
+        <input type="text" name="model" value={fields.model ?? ''} onChange={e => setField('model', e.target.value)} placeholder="MBR-200, pH7-Solution…" className={inputClass} />
       </FormField>
       <FormField label="Type" required>
-        <input type="text" placeholder="Arizona A2 dust, NaCl…" className={inputClass} />
+        <input type="text" name="consumableType" value={fields.consumableType ?? ''} onChange={e => setField('consumableType', e.target.value)} placeholder="Arizona A2 dust, NaCl…" className={inputClass} />
       </FormField>
       <FormField label="Lab ID Number" required>
-        <input type="text" placeholder="CON-2026-001" className={clsx(inputClass, 'font-mono')} />
+        <input type="text" name="labIdNumber" value={fields.labIdNumber ?? ''} onChange={e => setField('labIdNumber', e.target.value)} placeholder="CON-2026-001" className={clsx(inputClass, 'font-mono')} />
       </FormField>
       <FormField label="Quantity" required>
-        <input type="number" min="0" step="0.01" placeholder="0.00" className={inputClass} />
+        <input type="number" name="quantity" min="0" step="0.01" value={fields.quantity ?? ''} onChange={e => setField('quantity', e.target.value)} placeholder="0.00" className={inputClass} />
       </FormField>
       <FormField label="Unit" required>
-        <input type="text" placeholder="kg, L, pcs…" className={inputClass} />
+        <input type="text" name="unit" value={fields.unit ?? ''} onChange={e => setField('unit', e.target.value)} placeholder="kg, L, pcs…" className={inputClass} />
       </FormField>
       <FormField label="Lot Number">
-        <input type="text" placeholder="LOT-2026-0120" className={clsx(inputClass, 'font-mono')} />
+        <input type="text" name="lotNumber" value={fields.lotNumber ?? ''} onChange={e => setField('lotNumber', e.target.value)} placeholder="LOT-2026-0120" className={clsx(inputClass, 'font-mono')} />
       </FormField>
       <FormField label="Expiry Date">
-        <input type="date" className={inputClass} />
+        <input type="date" name="expiryDate" value={fields.expiryDate ?? ''} onChange={e => setField('expiryDate', e.target.value)} className={inputClass} />
       </FormField>
       <FormField label="Shelf Life (months)">
-        <input type="number" min="1" placeholder="12" className={inputClass} />
+        <input type="number" name="shelfLife" min="1" value={fields.shelfLife ?? ''} onChange={e => setField('shelfLife', e.target.value)} placeholder="12" className={inputClass} />
       </FormField>
       <div className="col-span-full">
         <FormField label="Comment">
-          <textarea rows={2} placeholder="Optional notes…" className={clsx(inputClass, 'resize-none')} />
+          <textarea name="comment" rows={2} value={fields.comment ?? ''} onChange={e => setField('comment', e.target.value)} placeholder="Optional notes…" className={clsx(inputClass, 'resize-none')} />
         </FormField>
       </div>
     </div>
   )
 }
 
-function MiscForm() {
+function MiscForm({ fields, setField }: {
+  fields: Record<string, string>
+  setField: (name: string, value: string) => void
+}) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
       <FormField label="Name" required>
-        <input type="text" placeholder="M5 Hex Bolt Set" className={inputClass} />
+        <input type="text" name="name" value={fields.name ?? ''} onChange={e => setField('name', e.target.value)} placeholder="M5 Hex Bolt Set" className={inputClass} />
       </FormField>
       <FormField label="Lab ID Number" required>
-        <input type="text" placeholder="MISC-001" className={clsx(inputClass, 'font-mono')} />
+        <input type="text" name="labIdNumber" value={fields.labIdNumber ?? ''} onChange={e => setField('labIdNumber', e.target.value)} placeholder="MISC-001" className={clsx(inputClass, 'font-mono')} />
       </FormField>
       <div className="col-span-full">
         <FormField label="Description">
-          <textarea rows={3} placeholder="Pack of 100 M5 hex bolts, stainless steel…" className={clsx(inputClass, 'resize-none')} />
+          <textarea name="description" rows={3} value={fields.description ?? ''} onChange={e => setField('description', e.target.value)} placeholder="Pack of 100 M5 hex bolts, stainless steel…" className={clsx(inputClass, 'resize-none')} />
         </FormField>
       </div>
       <div className="col-span-full">
         <FormField label="Comment">
-          <textarea rows={2} placeholder="Optional notes…" className={clsx(inputClass, 'resize-none')} />
+          <textarea name="comment" rows={2} value={fields.comment ?? ''} onChange={e => setField('comment', e.target.value)} placeholder="Optional notes…" className={clsx(inputClass, 'resize-none')} />
         </FormField>
       </div>
     </div>
@@ -242,13 +259,32 @@ export function AddItemPage() {
   const { type } = useParams<{ type: string }>()
   const navigate = useNavigate()
   const [saving, setSaving] = useState(false)
+  const [fields, setFields] = useState<Record<string, string>>({})
+  const [fixtureTypes, setFixtureTypes] = useState<FixtureType[]>([])
+  const [locationId, setLocationId] = useState('')
+  const [containerId, setContainerId] = useState('')
 
-  const formType = (type as ItemFormType) ?? 'electronics'
-  const title = FORM_TITLES[formType] ?? 'Add Item'
+  // BUG-010: validate type param
+  const formType: ItemFormType = VALID_TYPES.includes(type as ItemFormType)
+    ? (type as ItemFormType)
+    : 'electronics'
+  const title = FORM_TITLES[formType]
+
+  function setField(name: string, value: string) {
+    setFields(prev => ({ ...prev, [name]: value }))
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
+    const payload = {
+      itemType: formType,
+      ...fields,
+      ...(formType === 'fixture' ? { fixtureTypes } : {}),
+      locationId,
+      containerId,
+    }
+    console.log('AddItem payload:', payload)
     setTimeout(() => {
       setSaving(false)
       navigate('/items')
@@ -267,11 +303,11 @@ export function AddItemPage() {
         <Card>
           <CardHeader title={title} subtitle="Fill in the item information below" />
           <div className="p-5">
-            {formType === 'electronics' && <ElectronicsForm />}
-            {formType === 'fixture' && <FixtureForm />}
-            {formType === 'sparepart' && <SparePartForm />}
-            {formType === 'consumable' && <ConsumableForm />}
-            {formType === 'misc' && <MiscForm />}
+            {formType === 'electronics' && <ElectronicsForm fields={fields} setField={setField} />}
+            {formType === 'fixture' && <FixtureForm fields={fields} setField={setField} selectedTypes={fixtureTypes} setSelectedTypes={setFixtureTypes} />}
+            {formType === 'sparepart' && <SparePartForm fields={fields} setField={setField} />}
+            {formType === 'consumable' && <ConsumableForm fields={fields} setField={setField} />}
+            {formType === 'misc' && <MiscForm fields={fields} setField={setField} />}
           </div>
         </Card>
 
@@ -280,7 +316,7 @@ export function AddItemPage() {
           <CardHeader title="Storage Location" subtitle="Assign initial storage location" />
           <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
             <FormField label="Location">
-              <select className={inputClass}>
+              <select value={locationId} onChange={e => setLocationId(e.target.value)} className={inputClass}>
                 <option value="">— Select location —</option>
                 <option value="l1">A-01-01-1 (Sofia / Main Building)</option>
                 <option value="l2">A-01-01-2 (Sofia / Main Building)</option>
@@ -291,7 +327,7 @@ export function AddItemPage() {
               </select>
             </FormField>
             <FormField label="Container (optional)">
-              <select className={inputClass}>
+              <select value={containerId} onChange={e => setContainerId(e.target.value)} className={inputClass}>
                 <option value="">— No container —</option>
                 <option value="c1">BOX-0001</option>
                 <option value="c2">BOX-0002</option>

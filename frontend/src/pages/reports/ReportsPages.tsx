@@ -92,7 +92,9 @@ export function ItemsByLocationPage() {
 
 export function ExternalReportPage() {
   const externalItems = MOCK_ITEMS.filter(i => i.status === ItemStatus.TEMP_EXIT)
-  const overdueItems = externalItems.filter(i => i.id === 'item3') // mock overdue
+  const overdueItems = externalItems.filter(i =>
+    i.expectedReturnDate != null && new Date(i.expectedReturnDate) < new Date()
+  )
 
   return (
     <div className="space-y-5">
@@ -130,7 +132,7 @@ export function ExternalReportPage() {
             </thead>
             <tbody className="divide-y divide-slate-50">
               {externalItems.map(item => {
-                const isOverdue = item.id === 'item3'
+                const isOverdue = item.expectedReturnDate != null && new Date(item.expectedReturnDate) < new Date()
                 const exitOp = MOCK_OPERATIONS.find(op => op.itemId === item.id && op.operationType === OperationType.TEMP_EXIT)
 
                 return (

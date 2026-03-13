@@ -133,6 +133,7 @@ export interface BaseItem {
   locationLabel?: string
   externalLocationId?: string
   externalLocationName?: string
+  expectedReturnDate?: string
   labIdNumber: string
   comment?: string
   createdAt: string

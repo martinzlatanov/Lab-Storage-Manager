@@ -44,6 +44,9 @@
 | Routing | React Router v6 |
 
 ---
+## Backend and Database
+  - Keep a copy of the migration SQL file in the code.
+
 
 ## Critical TypeScript Constraints
 

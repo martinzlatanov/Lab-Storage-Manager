@@ -1,1 +1,18 @@
+# macOS
 .DS_Store
+
+# Environment — never commit real secrets
+.env
+.env.local
+.env.*.local
+
+# Node
+node_modules/
+
+# Build outputs
+frontend/dist/
+backend/dist/
+
+# Logs
+*.log
+npm-debug.log*
