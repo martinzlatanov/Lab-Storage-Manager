@@ -3,7 +3,7 @@
  * LocationBrowserPage, ContainerManagerPage, ExternalLocationsPage
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ChevronRight,
@@ -17,29 +17,62 @@ import {
   Phone,
   Mail,
   AlertTriangle,
+  Loader2,
 } from 'lucide-react'
 import { Card, CardHeader } from '../../components/ui/Card'
 import { ItemStatusBadge, ItemTypeBadge } from '../../components/ui/StatusBadge'
 import { MOCK_SITES, MOCK_CONTAINERS, MOCK_EXTERNAL_LOCATIONS, MOCK_ITEMS } from '../../mock/data'
-import { ItemStatus } from '../../types'
+import { ItemStatus, type AnyItem, type Site, type Container, type ExternalLocation } from '../../types'
+import { getSites as apiGetSites, getExternalLocations as apiGetExtLocs, getItems as apiGetItems, getContainers as apiGetContainers } from '../../api'
 import clsx from 'clsx'
+
+const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true'
 
 // ─── Location Browser ─────────────────────────────────────────────────────────
 
 export function LocationBrowserPage() {
+  const [sites, setSites] = useState<Site[]>(USE_MOCKS ? MOCK_SITES : [])
+  const [allItems, setAllItems] = useState<AnyItem[]>(USE_MOCKS ? MOCK_ITEMS : [])
+  const [loading, setLoading] = useState(!USE_MOCKS)
   const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null)
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null)
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null)
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null)
 
-  const selectedSite = MOCK_SITES.find(s => s.id === selectedSiteId)
+  useEffect(() => {
+    if (USE_MOCKS) return
+    const load = async () => {
+      setLoading(true)
+      try {
+        const [sitesRes, itemsRes] = await Promise.all([
+          apiGetSites(),
+          apiGetItems({ pageSize: 500 }),
+        ])
+        setSites(sitesRes.data as any)
+        setAllItems(itemsRes.data)
+      } catch { /* fallback empty */ }
+      finally { setLoading(false) }
+    }
+    load()
+  }, [])
+
+  const selectedSite = sites.find(s => s.id === selectedSiteId)
   const selectedBuilding = selectedSite?.buildings.find(b => b.id === selectedBuildingId)
   const selectedArea = selectedBuilding?.storageAreas.find(a => a.id === selectedAreaId)
   const selectedLocation = selectedArea?.locations.find(l => l.id === selectedLocationId)
 
   const itemsAtLocation = selectedLocationId
-    ? MOCK_ITEMS.filter(i => i.locationId === selectedLocationId)
+    ? allItems.filter(i => i.locationId === selectedLocationId)
     : []
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20 gap-2 text-slate-400">
+        <Loader2 size={20} className="animate-spin" />
+        <span className="text-sm">Loading storage…</span>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-5">
@@ -87,7 +120,7 @@ export function LocationBrowserPage() {
           <Card>
             <CardHeader title="Sites" />
             <div className="divide-y divide-slate-50">
-              {MOCK_SITES.map(site => (
+              {sites.map(site => (
                 <button
                   key={site.id}
                   onClick={() => { setSelectedSiteId(site.id); setSelectedBuildingId(null); setSelectedAreaId(null); setSelectedLocationId(null) }}
@@ -162,7 +195,7 @@ export function LocationBrowserPage() {
               />
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4">
                 {selectedArea.locations.map(loc => {
-                  const count = MOCK_ITEMS.filter(i => i.locationId === loc.id).length
+                  const count = allItems.filter(i => i.locationId === loc.id).length
                   return (
                     <button
                       key={loc.id}
@@ -185,10 +218,13 @@ export function LocationBrowserPage() {
                 title={`Location ${selectedLocation.label}`}
                 subtitle={`${selectedArea?.code} · ${selectedBuilding?.name} · ${selectedSite?.name}`}
                 actions={
-                  <button className="flex items-center gap-1.5 text-xs text-slate-600 border border-slate-200 px-2.5 py-1.5 rounded-lg hover:bg-slate-50">
+                  <Link
+                    to={`/labels?tab=location&location=${selectedLocation.id}`}
+                    className="flex items-center gap-1.5 text-xs text-slate-600 border border-slate-200 px-2.5 py-1.5 rounded-lg hover:bg-slate-50"
+                  >
                     <Printer size={12} />
                     Print Label
-                  </button>
+                  </Link>
                 }
               />
               <div className="p-4">
@@ -233,10 +269,40 @@ export function LocationBrowserPage() {
 // ─── Container Manager ────────────────────────────────────────────────────────
 
 export function ContainerManagerPage() {
+  const [containers, setContainers] = useState<Container[]>(USE_MOCKS ? MOCK_CONTAINERS : [])
+  const [allItems, setAllItems] = useState<AnyItem[]>(USE_MOCKS ? MOCK_ITEMS : [])
+  const [loading, setLoading] = useState(!USE_MOCKS)
+
+  useEffect(() => {
+    if (USE_MOCKS) return
+    const load = async () => {
+      setLoading(true)
+      try {
+        const [ctRes, itemsRes] = await Promise.all([
+          apiGetContainers(),
+          apiGetItems({ pageSize: 500 }),
+        ])
+        setContainers(ctRes.data as any)
+        setAllItems(itemsRes.data)
+      } catch { /* fallback empty */ }
+      finally { setLoading(false) }
+    }
+    load()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20 gap-2 text-slate-400">
+        <Loader2 size={20} className="animate-spin" />
+        <span className="text-sm">Loading containers…</span>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500">{MOCK_CONTAINERS.length} containers</p>
+        <p className="text-sm text-slate-500">{containers.length} containers</p>
         <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
           <Plus size={15} />
           New Container
@@ -244,9 +310,10 @@ export function ContainerManagerPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {MOCK_CONTAINERS.map(container => {
-          const items = MOCK_ITEMS.filter(i => i.containerId === container.id)
+        {containers.map(container => {
+          const items = allItems.filter(i => i.containerId === container.id)
           const isExternal = !!container.externalLocationId
+          const locLabel = (container as any).location?.label ?? container.locationLabel ?? ''
 
           return (
             <Card key={container.id} className="p-4">
@@ -263,14 +330,18 @@ export function ContainerManagerPage() {
                     <p className="text-xs text-slate-500 mt-0.5">
                       {isExternal
                         ? <span className="text-yellow-600 flex items-center gap-1"><ExtLink size={10} /> External</span>
-                        : container.locationLabel}
+                        : locLabel}
                     </p>
                   </div>
                 </div>
                 <div className="flex gap-1">
-                  <button className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors">
+                  <Link
+                    to={`/labels?tab=container&container=${container.id}`}
+                    className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+                    title="Print container label"
+                  >
                     <Printer size={14} />
-                  </button>
+                  </Link>
                   <button className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors">
                     <ArrowRightLeft size={14} />
                   </button>
@@ -313,12 +384,42 @@ export function ContainerManagerPage() {
 // ─── External Locations ───────────────────────────────────────────────────────
 
 export function ExternalLocationsPage() {
-  const externalItems = MOCK_ITEMS.filter(i => i.status === ItemStatus.TEMP_EXIT)
+  const [extLocs, setExtLocs] = useState<ExternalLocation[]>(USE_MOCKS ? MOCK_EXTERNAL_LOCATIONS : [])
+  const [externalItems, setExternalItems] = useState<AnyItem[]>(
+    USE_MOCKS ? MOCK_ITEMS.filter(i => i.status === ItemStatus.TEMP_EXIT) : [],
+  )
+  const [loading, setLoading] = useState(!USE_MOCKS)
+
+  useEffect(() => {
+    if (USE_MOCKS) return
+    const load = async () => {
+      setLoading(true)
+      try {
+        const [extRes, itemsRes] = await Promise.all([
+          apiGetExtLocs(),
+          apiGetItems({ status: ItemStatus.TEMP_EXIT, pageSize: 200 }),
+        ])
+        setExtLocs(extRes.data)
+        setExternalItems(itemsRes.data)
+      } catch { /* fallback empty */ }
+      finally { setLoading(false) }
+    }
+    load()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20 gap-2 text-slate-400">
+        <Loader2 size={20} className="animate-spin" />
+        <span className="text-sm">Loading external locations…</span>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-        {MOCK_EXTERNAL_LOCATIONS.map(ext => {
+        {extLocs.map(ext => {
           const itemsHere = externalItems.filter(i => i.externalLocationId === ext.id)
           const overdueCount = itemsHere.filter(i =>
             i.expectedReturnDate != null && new Date(i.expectedReturnDate) < new Date()

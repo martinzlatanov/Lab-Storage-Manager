@@ -9,11 +9,33 @@
 ## [Unreleased]
 
 ### Planned
-- TypeScript type definitions implementation (`src/shared/types/`)
-- Prisma schema (`prisma/schema.prisma`)
-- Docker Compose setup
-- Backend scaffold (Fastify + LDAP auth + JWT)
-- Frontend scaffold (React + Vite + routing)
+- Remaining page wiring (AddItemPage, OperationsPages, ReportsPages)
+- Barcode scan input handling (web + Android)
+- Label print service hardware integration
+
+---
+
+## [2026-03-13] — Frontend-Backend Integration
+
+### Added
+- `prisma/seed.ts` — database seed script with all sample data (5 users, 3 sites, 13 items, 10 operations)
+- `prisma/migration_init.sql` — full initial migration SQL
+- `prisma.seed` config in `package.json` for `npx prisma db seed`
+- `frontend/src/api/` — complete API client layer (client, auth, items, operations, sites, containers)
+- `frontend/src/context/AuthContext.tsx` — React auth context with JWT token management
+- Vite proxy config for `/api` → backend
+- `VITE_USE_MOCKS` env toggle for mock vs API data on all pages
+- Sortable Item List table columns
+- Deep-linking from Print Label buttons to Labels page
+
+### Changed
+- `ItemListPage` — fetches from API with loading/error states
+- `ItemDetailPage` — fetches item + operation history from API
+- `DashboardPage` — computes stats from API responses
+- `StoragePages` (Location, Container, External) — all wired to API
+- `LoginPage` — real LDAP auth via AuthContext
+- `App.tsx` — wrapped with `AuthProvider`
+- `LabelsPage` — accepts URL search params for pre-selection
 
 ---
 

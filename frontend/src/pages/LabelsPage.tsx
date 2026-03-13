@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Printer, QrCode, Barcode, Package, MapPin } from 'lucide-react'
 import { Card, CardHeader } from '../components/ui/Card'
 import { MOCK_ITEMS, MOCK_CONTAINERS, MOCK_SITES } from '../mock/data'
@@ -23,10 +24,33 @@ function LabelPreview({ type, value, subtitle }: { type: 'item' | 'location' | '
 type TabType = 'item' | 'location' | 'container'
 
 export function LabelsPage() {
-  const [tab, setTab] = useState<TabType>('item')
-  const [selectedItem, setSelectedItem] = useState('')
-  const [selectedContainer, setSelectedContainer] = useState('')
-  const [selectedLocation, setSelectedLocation] = useState('')
+  const [searchParams] = useSearchParams()
+  const [tab, setTab] = useState<TabType>((searchParams.get('tab') as TabType) || 'item')
+  const [selectedItem, setSelectedItem] = useState(searchParams.get('item') || '')
+  const [selectedContainer, setSelectedContainer] = useState(searchParams.get('container') || '')
+  const [selectedLocation, setSelectedLocation] = useState(searchParams.get('location') || '')
+
+  useEffect(() => {
+    const itemParam = searchParams.get('item')
+    const locParam = searchParams.get('location')
+    const conParam = searchParams.get('container')
+    const tabParam = searchParams.get('tab') as TabType
+
+    if (itemParam) {
+      setSelectedItem(itemParam)
+      setTab('item')
+    } else if (locParam) {
+      setSelectedLocation(locParam)
+      setTab('location')
+    } else if (conParam) {
+      setSelectedContainer(conParam)
+      setTab('container')
+    }
+
+    if (tabParam && ['item', 'location', 'container'].includes(tabParam)) {
+      setTab(tabParam)
+    }
+  }, [searchParams])
 
   const allLocations = MOCK_SITES.flatMap(s =>
     s.buildings.flatMap(b =>

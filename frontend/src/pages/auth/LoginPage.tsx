@@ -1,16 +1,18 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FlaskConical, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { useAuth } from '../../context/AuthContext'
 
 export function LoginPage() {
   const navigate = useNavigate()
+  const { login } = useAuth()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
 
@@ -20,11 +22,14 @@ export function LoginPage() {
     }
 
     setLoading(true)
-    // Simulate LDAP auth
-    setTimeout(() => {
-      setLoading(false)
+    try {
+      await login(username, password)
       navigate('/')
-    }, 1200)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Authentication failed')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (

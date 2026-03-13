@@ -1,33 +1,86 @@
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Filter, Plus, ScanLine, ChevronDown } from 'lucide-react'
+import { Filter, Plus, ScanLine, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown, Loader2 } from 'lucide-react'
 import { Card } from '../../components/ui/Card'
 import { ItemStatusBadge, ItemTypeBadge } from '../../components/ui/StatusBadge'
 import { MOCK_ITEMS } from '../../mock/data'
-import { ItemType, ItemStatus, ITEM_TYPE_LABELS } from '../../types'
+import { ItemType, ItemStatus, ITEM_TYPE_LABELS, type AnyItem } from '../../types'
+import { getItems } from '../../api'
 import clsx from 'clsx'
+
+const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true'
 
 function formatDate(iso: string) {
   return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(iso))
 }
 
-function getItemDisplayName(item: (typeof MOCK_ITEMS)[0]): string {
+function getItemDisplayName(item: AnyItem): string {
   switch (item.itemType) {
     case ItemType.ELECTRONICS_SAMPLE: return (item as { productName: string }).productName
     case ItemType.FIXTURE: return (item as { productName: string }).productName
     case ItemType.SPARE_PART: return `${(item as { manufacturer: string; model: string }).manufacturer} ${(item as { model: string }).model}`
     case ItemType.CONSUMABLE: return (item as { consumableType: string }).consumableType
-    case ItemType.MISC: return (item as { name: string }).name
+    case ItemType.MISC: return (item as { name?: string; miscName?: string }).name ?? (item as { miscName?: string }).miscName ?? ''
   }
 }
 
+function getItemLocation(item: AnyItem): string {
+  // API response nests location objects; mock data has flat labels
+  const asAny = item as Record<string, any>
+  if (asAny.externalLocation?.name) return asAny.externalLocation.name
+  if (asAny.externalLocationName) return asAny.externalLocationName
+  if (asAny.location?.label) return asAny.location.label
+  if (asAny.locationLabel) return asAny.locationLabel
+  return ''
+}
+
+function getItemContainer(item: AnyItem): string {
+  const asAny = item as Record<string, any>
+  if (asAny.container?.label) return asAny.container.label
+  if (asAny.containerLabel) return asAny.containerLabel
+  return ''
+}
+
+type SortField = 'labIdNumber' | 'itemType' | 'name' | 'status' | 'location' | 'updatedAt'
+
 export function ItemListPage() {
+  const [items, setItems] = useState<AnyItem[]>(USE_MOCKS ? MOCK_ITEMS : [])
+  const [loading, setLoading] = useState(!USE_MOCKS)
+  const [error, setError] = useState('')
+  const [totalItems, setTotalItems] = useState(USE_MOCKS ? MOCK_ITEMS.length : 0)
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<ItemType | ''>('')
   const [statusFilter, setStatusFilter] = useState<ItemStatus | ''>('')
   const [showScrapped, setShowScrapped] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [sortField, setSortField] = useState<SortField>('updatedAt')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Fetch from API
+  const fetchItems = useCallback(async () => {
+    if (USE_MOCKS) return
+    setLoading(true)
+    setError('')
+    try {
+      const res = await getItems({
+        ...(typeFilter ? { itemType: typeFilter } : {}),
+        ...(statusFilter ? { status: statusFilter } : {}),
+        ...(search ? { search } : {}),
+        pageSize: 100,
+      })
+      setItems(res.data)
+      setTotalItems(res.meta.total)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load items')
+    } finally {
+      setLoading(false)
+    }
+  }, [typeFilter, statusFilter, search])
+
+  useEffect(() => {
+    fetchItems()
+  }, [fetchItems])
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -39,22 +92,99 @@ export function ItemListPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [dropdownOpen])
 
-  const filtered = useMemo(() => {
-    return MOCK_ITEMS.filter((item) => {
-      if (!showScrapped && item.status === ItemStatus.SCRAPPED) return false
-      if (typeFilter && item.itemType !== typeFilter) return false
-      if (statusFilter && item.status !== statusFilter) return false
-      if (search) {
-        const q = search.toLowerCase()
-        return (
-          item.labIdNumber.toLowerCase().includes(q) ||
-          getItemDisplayName(item).toLowerCase().includes(q) ||
-          (item.locationLabel ?? '').toLowerCase().includes(q)
-        )
+  const filteredAndSorted = useMemo(() => {
+    // When using API, filtering is server-side, but we still filter scrapped client-side
+    let data = items
+    if (USE_MOCKS) {
+      data = data.filter((item) => {
+        if (!showScrapped && item.status === ItemStatus.SCRAPPED) return false
+        if (typeFilter && item.itemType !== typeFilter) return false
+        if (statusFilter && item.status !== statusFilter) return false
+        if (search) {
+          const q = search.toLowerCase()
+          return (
+            item.labIdNumber.toLowerCase().includes(q) ||
+            getItemDisplayName(item).toLowerCase().includes(q) ||
+            getItemLocation(item).toLowerCase().includes(q)
+          )
+        }
+        return true
+      })
+    } else {
+      if (!showScrapped) {
+        data = data.filter((item) => item.status !== ItemStatus.SCRAPPED)
       }
-      return true
+    }
+
+    // Sort
+    return [...data].sort((a, b) => {
+      let valA: any = ''
+      let valB: any = ''
+
+      switch (sortField) {
+        case 'labIdNumber':
+          valA = a.labIdNumber
+          valB = b.labIdNumber
+          break
+        case 'itemType':
+          valA = ITEM_TYPE_LABELS[a.itemType]
+          valB = ITEM_TYPE_LABELS[b.itemType]
+          break
+        case 'name':
+          valA = getItemDisplayName(a).toLowerCase()
+          valB = getItemDisplayName(b).toLowerCase()
+          break
+        case 'status':
+          valA = a.status
+          valB = b.status
+          break
+        case 'location':
+          valA = getItemLocation(a).toLowerCase()
+          valB = getItemLocation(b).toLowerCase()
+          break
+        case 'updatedAt':
+          valA = new Date(a.updatedAt).getTime()
+          valB = new Date(b.updatedAt).getTime()
+          break
+      }
+
+      const order = sortOrder === 'asc' ? 1 : -1
+      if (valA < valB) return -1 * order
+      if (valA > valB) return 1 * order
+      return 0
     })
-  }, [search, typeFilter, statusFilter, showScrapped])
+  }, [items, search, typeFilter, statusFilter, showScrapped, sortField, sortOrder])
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortOrder(field === 'updatedAt' ? 'desc' : 'asc')
+    }
+  }
+
+  function SortIndicator({ field }: { field: SortField }) {
+    if (sortField !== field) return <ArrowUpDown size={12} className="opacity-30 group-hover:opacity-100 transition-opacity" />
+    return sortOrder === 'asc' ? <ArrowUp size={12} className="text-blue-600" /> : <ArrowDown size={12} className="text-blue-600" />
+  }
+
+  function Header({ field, label, className }: { field: SortField; label: string; className?: string }) {
+    return (
+      <th 
+        className={clsx(
+          "px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide cursor-pointer group hover:bg-slate-50 transition-colors select-none",
+          className
+        )}
+        onClick={() => handleSort(field)}
+      >
+        <div className="flex items-center gap-1.5">
+          {label}
+          <SortIndicator field={field} />
+        </div>
+      </th>
+    )
+  }
 
   return (
     <div className="space-y-4">
@@ -152,68 +282,89 @@ export function ItemListPage() {
         </div>
       </div>
 
+      {/* Error banner */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-3 flex items-center gap-3 text-sm text-red-700">
+          <span>{error}</span>
+          <button onClick={fetchItems} className="ml-auto text-red-600 hover:text-red-700 text-xs font-medium">Retry</button>
+        </div>
+      )}
+
       {/* Table */}
       <Card>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-100 text-left">
-                <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Lab ID</th>
-                <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
-                <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Name / Description</th>
-                <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-                <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Location</th>
-                <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Updated</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="text-center py-12 text-slate-400">
-                    No items match your search.
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((item) => (
-                  <tr
-                    key={item.id}
-                    className={clsx(
-                      'hover:bg-slate-50 transition-colors',
-                      item.status === ItemStatus.SCRAPPED && 'opacity-60',
-                    )}
-                  >
-                    <td className="px-5 py-3.5">
-                      <Link
-                        to={`/items/${item.id}`}
-                        className="font-mono text-blue-600 hover:text-blue-700 font-medium text-xs"
-                      >
-                        {item.labIdNumber}
-                      </Link>
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <ItemTypeBadge type={item.itemType} />
-                    </td>
-                    <td className="px-5 py-3.5 text-slate-700">{getItemDisplayName(item)}</td>
-                    <td className="px-5 py-3.5">
-                      <ItemStatusBadge status={item.status} />
-                    </td>
-                    <td className="px-5 py-3.5 text-slate-500 text-xs font-mono">
-                      {item.externalLocationName
-                        ? <span className="text-yellow-600">{item.externalLocationName}</span>
-                        : item.locationLabel ?? '—'}
-                    </td>
-                    <td className="px-5 py-3.5 text-slate-400 text-xs">{formatDate(item.updatedAt)}</td>
+        {loading ? (
+          <div className="flex items-center justify-center py-16 gap-2 text-slate-400">
+            <Loader2 size={18} className="animate-spin" />
+            <span className="text-sm">Loading items…</span>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100 text-left">
+                    <Header field="labIdNumber" label="Lab ID" />
+                    <Header field="itemType" label="Type" />
+                    <Header field="name" label="Name / Description" />
+                    <Header field="status" label="Status" />
+                    <Header field="location" label="Location" />
+                    <Header field="updatedAt" label="Updated" />
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {filteredAndSorted.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="text-center py-12 text-slate-400">
+                        No items match your search.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredAndSorted.map((item) => {
+                      const location = getItemLocation(item)
+                      const isExternal = !!(item as any).externalLocationId || !!(item as any).externalLocationName
+                      return (
+                        <tr
+                          key={item.id}
+                          className={clsx(
+                            'hover:bg-slate-50 transition-colors',
+                            item.status === ItemStatus.SCRAPPED && 'opacity-60',
+                          )}
+                        >
+                          <td className="px-5 py-3.5">
+                            <Link
+                              to={`/items/${item.id}`}
+                              className="font-mono text-blue-600 hover:text-blue-700 font-medium text-xs"
+                            >
+                              {item.labIdNumber}
+                            </Link>
+                          </td>
+                          <td className="px-5 py-3.5">
+                            <ItemTypeBadge type={item.itemType} />
+                          </td>
+                          <td className="px-5 py-3.5 text-slate-700">{getItemDisplayName(item)}</td>
+                          <td className="px-5 py-3.5">
+                            <ItemStatusBadge status={item.status} />
+                          </td>
+                          <td className="px-5 py-3.5 text-slate-500 text-xs font-mono">
+                            {isExternal
+                              ? <span className="text-yellow-600">{location}</span>
+                              : location || '—'}
+                          </td>
+                          <td className="px-5 py-3.5 text-slate-400 text-xs">{formatDate(item.updatedAt)}</td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
 
-        <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-          <span>Showing {filtered.length} of {MOCK_ITEMS.filter(i => showScrapped || i.status !== ItemStatus.SCRAPPED).length} items</span>
-          <span className="text-slate-400">Scrapped items {showScrapped ? 'shown' : 'hidden'}</span>
-        </div>
+            <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+              <span>Showing {filteredAndSorted.length} of {totalItems} items</span>
+              <span className="text-slate-400">Scrapped items {showScrapped ? 'shown' : 'hidden'}</span>
+            </div>
+          </>
+        )}
       </Card>
     </div>
   )

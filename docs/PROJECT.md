@@ -110,13 +110,25 @@ See `DECISIONS.md` for full log.
 
 ## Next Steps (Ordered)
 
-- [ ] TypeScript type definitions (`TYPES.md` → `src/shared/types/`)
-- [ ] Screen inventory (`SCREENS.md`)
-- [ ] Prisma schema (`prisma/schema.prisma`)
-- [ ] Docker Compose setup (`docker-compose.yml`)
-- [ ] Backend scaffold (Fastify + auth middleware)
-- [ ] Frontend scaffold (React + Vite + routing)
-- [ ] Label print service abstraction
+- [x] TypeScript type definitions (`TYPES.md` → `src/shared/types/`)
+- [x] Screen inventory (`SCREENS.md`)
+- [x] Prisma schema init (`prisma/schema.prisma`)
+- [x] Docker Compose setup (`docker-compose.yml`)
+- [x] Backend scaffolded (Fastify + TS)
+- [x] Frontend scaffolded (React + Vite + routing)
+- [x] Mock data system implementation
+- [x] Item List & Detail screens
+- [x] Location Browser & Container Manager
+- [x] Label printing preview system
+- [x] **Bugfixes: Print Label buttons connection**
+- [x] **Feature: Sortable Item List table**
+- [x] Backend API routes implemented (items, operations, sites, containers, users, reports, auth)
+- [x] LDAP/JWT auth implementation (backend plugin + route)
+- [x] Database seed script (`prisma/seed.ts`)
+- [x] Initial migration SQL (`prisma/migration_init.sql`)
+- [x] Frontend-Backend integration (API client + major pages wired)
+- [ ] Remaining page wiring (AddItemPage, OperationsPages, ReportsPages)
+- [ ] Label print service hardware integration
 - [ ] Barcode scan input handling (web + Android)
 
 ---

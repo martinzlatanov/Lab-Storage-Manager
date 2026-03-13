@@ -1,4 +1,5 @@
 import { useParams, Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
 import {
   ArrowLeft,
   MapPin,
@@ -11,13 +12,17 @@ import {
   Trash2,
   FlaskConical,
   ExternalLink,
+  Loader2,
 } from 'lucide-react'
 import { Card, CardHeader } from '../../components/ui/Card'
 import { ItemStatusBadge, ItemTypeBadge, OperationBadge } from '../../components/ui/StatusBadge'
 import { Badge } from '../../components/ui/Badge'
 import { MOCK_ITEMS, MOCK_OPERATIONS } from '../../mock/data'
 import { ItemType, ItemStatus, FIXTURE_TYPE_LABELS, DEV_PHASE_LABELS } from '../../types'
-import type { ElectronicsSample, Fixture, SparePart, Consumable, MiscItem } from '../../types'
+import type { AnyItem, ElectronicsSample, Fixture, SparePart, Consumable, MiscItem, OperationRecord } from '../../types'
+import { getItem, getItemHistory } from '../../api'
+
+const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true'
 
 function formatDate(iso: string, includeTime = false) {
   return new Intl.DateTimeFormat('en-GB', {
@@ -38,9 +43,107 @@ function Field({ label, value }: { label: string; value?: React.ReactNode }) {
   )
 }
 
+function getLocation(item: AnyItem): { label: string; isExternal: boolean } {
+  const a = item as Record<string, any>
+  if (a.externalLocation?.name) return { label: a.externalLocation.name, isExternal: true }
+  if (a.externalLocationName) return { label: a.externalLocationName, isExternal: true }
+  if (a.location?.label) return { label: a.location.label, isExternal: false }
+  if (a.locationLabel) return { label: a.locationLabel, isExternal: false }
+  return { label: '', isExternal: false }
+}
+
+function getContainerLabel(item: AnyItem): string {
+  const a = item as Record<string, any>
+  return a.container?.label ?? a.containerLabel ?? ''
+}
+
+function getCreatedByName(item: AnyItem): string {
+  const a = item as Record<string, any>
+  return a.createdBy?.displayName ?? a.createdByName ?? ''
+}
+
 export function ItemDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const item = MOCK_ITEMS.find((i) => i.id === id)
+  const [item, setItem] = useState<AnyItem | null>(null)
+  const [itemOps, setItemOps] = useState<OperationRecord[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!id) return
+
+    if (USE_MOCKS) {
+      const found = MOCK_ITEMS.find((i) => i.id === id)
+      setItem(found ?? null)
+      setItemOps(
+        MOCK_OPERATIONS.filter((op) => op.itemId === id).sort(
+          (a, b) => new Date(b.performedAt).getTime() - new Date(a.performedAt).getTime(),
+        ),
+      )
+      setLoading(false)
+      return
+    }
+
+    // Fetch from API
+    const load = async () => {
+      setLoading(true)
+      setError('')
+      try {
+        const [itemRes, historyRes] = await Promise.all([
+          getItem(id),
+          getItemHistory(id),
+        ])
+        setItem(itemRes.data)
+        // Map API history to OperationRecord-compatible shape
+        setItemOps(
+          historyRes.data.map((op: any) => ({
+            id: op.id,
+            operationType: op.operationType,
+            itemId: id,
+            itemLabId: itemRes.data.labIdNumber,
+            itemDescription: '',
+            performedById: op.performedBy?.id ?? '',
+            performedByName: op.performedBy?.displayName ?? '',
+            performedAt: op.performedAt,
+            fromLocationLabel: op.fromLocation?.label,
+            toLocationLabel: op.toLocation?.label,
+            fromContainerLabel: op.fromContainer?.label,
+            toContainerLabel: op.toContainer?.label,
+            fromExternalLocationName: op.fromExternalLocation?.name,
+            toExternalLocationName: op.toExternalLocation?.name,
+            expectedReturnDate: op.expectedReturnDate,
+            quantityConsumed: op.quantityConsumed,
+            notes: op.notes,
+          })),
+        )
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load item')
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [id])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20 gap-2 text-slate-400">
+        <Loader2 size={20} className="animate-spin" />
+        <span className="text-sm">Loading item…</span>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-slate-500">
+        <p className="text-lg font-medium text-red-600">{error}</p>
+        <Link to="/items" className="mt-3 text-blue-600 hover:text-blue-700 text-sm flex items-center gap-1">
+          <ArrowLeft size={14} /> Back to Items
+        </Link>
+      </div>
+    )
+  }
 
   if (!item) {
     return (
@@ -53,11 +156,10 @@ export function ItemDetailPage() {
     )
   }
 
-  const itemOps = MOCK_OPERATIONS.filter((op) => op.itemId === item.id).sort(
-    (a, b) => new Date(b.performedAt).getTime() - new Date(a.performedAt).getTime(),
-  )
-
   const isScrapped = item.status === ItemStatus.SCRAPPED
+  const loc = getLocation(item)
+  const containerLabel = getContainerLabel(item)
+  const createdByName = getCreatedByName(item)
 
   return (
     <div className="space-y-5 max-w-4xl">
@@ -77,16 +179,20 @@ export function ItemDetailPage() {
             </div>
             <h2 className="text-xl font-bold text-slate-900 font-mono">{item.labIdNumber}</h2>
             <p className="text-slate-500 text-sm mt-1">
-              Added by {item.createdByName} · {formatDate(item.createdAt)}
+              Added by {createdByName} · {formatDate(item.createdAt)}
             </p>
           </div>
 
           {!isScrapped && (
             <div className="flex items-center gap-2 flex-wrap">
-              <button className="flex items-center gap-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm px-3 py-1.5 rounded-lg transition-colors">
+              <Link
+                to={`/labels?item=${item.id}`}
+                className="flex items-center gap-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm px-3 py-1.5 rounded-lg transition-colors"
+                title="Print label for this item"
+              >
                 <Printer size={14} />
                 Print Label
-              </button>
+              </Link>
               <Link
                 to="/operations/move"
                 className="flex items-center gap-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm px-3 py-1.5 rounded-lg transition-colors"
@@ -125,18 +231,18 @@ export function ItemDetailPage() {
         <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-4 flex-wrap text-sm text-slate-600">
           <div className="flex items-center gap-2">
             <MapPin size={14} className="text-slate-400" />
-            {item.externalLocationName ? (
-              <span className="text-yellow-600 font-medium">{item.externalLocationName} (External)</span>
-            ) : item.locationLabel ? (
-              <span className="font-mono">{item.locationLabel}</span>
+            {loc.isExternal ? (
+              <span className="text-yellow-600 font-medium">{loc.label} (External)</span>
+            ) : loc.label ? (
+              <span className="font-mono">{loc.label}</span>
             ) : (
               <span className="text-slate-400">No location assigned</span>
             )}
           </div>
-          {item.containerLabel && (
+          {containerLabel && (
             <div className="flex items-center gap-2">
               <Box size={14} className="text-slate-400" />
-              <span className="font-mono">{item.containerLabel}</span>
+              <span className="font-mono">{containerLabel}</span>
             </div>
           )}
           {item.comment && (
@@ -253,7 +359,7 @@ export function ItemDetailPage() {
                 <User size={13} className="text-slate-400" />
                 <div>
                   <p className="text-xs text-slate-400">Added by</p>
-                  <p className="text-xs text-slate-700">{item.createdByName}</p>
+                  <p className="text-xs text-slate-700">{createdByName}</p>
                 </div>
               </div>
             </div>
