@@ -9,7 +9,7 @@
  * Requires:  DATABASE_URL to be set (postgres running)
  */
 
-import { PrismaClient } from "@prisma/client";
+import { OperationType, PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -464,27 +464,27 @@ async function main() {
   console.log("  → Operations...");
   const operations = [
     {
-      id: "op1", operationType: "RECEIPT" as const,
+      id: "op1", operationType: OperationType.RECEIPT,
       itemId: "item1", performedById: "u2",
       performedAt: new Date("2026-01-15T09:00:00Z"),
       toLocationId: "l1", toContainerId: "c1",
       notes: "Received from BMW supplier via DHL",
     },
     {
-      id: "op2", operationType: "RECEIPT" as const,
+      id: "op2", operationType: OperationType.RECEIPT,
       itemId: "item2", performedById: "u2",
       performedAt: new Date("2026-01-15T09:05:00Z"),
       toLocationId: "l1", toContainerId: "c1",
     },
     {
-      id: "op3", operationType: "MOVE" as const,
+      id: "op3", operationType: OperationType.MOVE,
       itemId: "item2", performedById: "u1",
       performedAt: new Date("2026-02-20T14:30:00Z"),
       fromLocationId: "l2", fromContainerId: "c2",
       toLocationId: "l1", toContainerId: "c1",
     },
     {
-      id: "op4", operationType: "TEMP_EXIT" as const,
+      id: "op4", operationType: OperationType.TEMP_EXIT,
       itemId: "item3", performedById: "u1",
       performedAt: new Date("2026-02-28T08:00:00Z"),
       fromLocationId: "l1",
@@ -493,39 +493,53 @@ async function main() {
       notes: "Sent for environmental testing",
     },
     {
-      id: "op5", operationType: "SCRAP" as const,
+      id: "op5", operationType: OperationType.SCRAP,
       itemId: "item4", performedById: "u2",
       performedAt: new Date("2025-12-15T11:00:00Z"),
       notes: "Failed drop test — ESD damage confirmed",
     },
     {
-      id: "op6", operationType: "CONSUME" as const,
+      id: "op6", operationType: OperationType.CONSUME,
       itemId: "item9", performedById: "u2",
       performedAt: new Date("2026-01-10T15:00:00Z"),
       quantityConsumed: 0.5,
       notes: "Used for IP5x dust ingress test batch #12",
     },
     {
-      id: "op7", operationType: "CONSUME" as const,
+      id: "op7", operationType: OperationType.CONSUME,
       itemId: "item12", performedById: "u2",
       performedAt: new Date("2026-02-15T10:00:00Z"),
       quantityConsumed: 2.0,
       notes: "Last batch consumed — stock depleted",
     },
     {
-      id: "op8", operationType: "RECEIPT" as const,
+      id: "op8", operationType: OperationType.RECEIPT,
       itemId: "item9", performedById: "u2",
       performedAt: new Date("2025-04-01T08:00:00Z"),
       toLocationId: "l5",
     },
     {
-      id: "op9", operationType: "RECEIPT" as const,
+      id: "op9", operationType: OperationType.RECEIPT,
       itemId: "item5", performedById: "u2",
       performedAt: new Date("2025-06-10T08:00:00Z"),
       toLocationId: "l3",
     },
     {
-      id: "op10", operationType: "TEMP_EXIT" as const,
+      id: "op11", operationType: OperationType.RECEIPT,
+      itemId: "item3", performedById: "u1",
+      performedAt: new Date("2025-11-01T10:00:00Z"),
+      toLocationId: "l1",
+      notes: "Received from STLA supplier",
+    },
+    {
+      id: "op12", operationType: OperationType.RECEIPT,
+      itemId: "item6", performedById: "u1",
+      performedAt: new Date("2025-09-01T08:00:00Z"),
+      toLocationId: "l4",
+      notes: "Received from manufacturer",
+    },
+    {
+      id: "op10", operationType: OperationType.TEMP_EXIT,
       itemId: "item6", performedById: "u1",
       performedAt: new Date("2026-03-01T08:00:00Z"),
       fromLocationId: "l4",
@@ -542,7 +556,7 @@ async function main() {
       create: op,
     });
   }
-  console.log(`    ✓ ${operations.length} operations`);
+  console.log(`    ✓ ${operations.length} operations`); // 12 total
 
   console.log("\n✅ Seed complete!\n");
 }

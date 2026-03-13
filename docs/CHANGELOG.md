@@ -15,6 +15,14 @@
 
 ---
 
+## [2026-03-13] — Seed data fixes
+
+### Fixed
+- `prisma/seed.ts`: replaced `as const` string literals on `operationType` with `OperationType` enum imported from `@prisma/client` — eliminates the unused-import hint and makes typos a compile error
+- `prisma/seed.ts`: added missing RECEIPT operations (op11 for item3 at l1, op12 for item6 at l4) so that the `fromLocationId` values in the subsequent TEMP_EXIT operations (op4, op10) are traceable in the audit log — previously the exit operations referenced locations the items were never recorded at
+
+---
+
 ## [2026-03-13] — Frontend-Backend Integration
 
 ### Added
