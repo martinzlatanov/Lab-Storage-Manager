@@ -1,6 +1,6 @@
 // ─── Sites & Locations API ────────────────────────────────────────────────────
 
-import { apiGet, apiPost } from './client'
+import { apiGet, apiPost, toQueryString } from './client'
 import type { ExternalLocation } from '../types'
 
 // ── Response types ──────────────────────────────────────────────────────────
@@ -110,4 +110,14 @@ export function createLocation(areaId: string, row: string, shelf: string, level
 
 export function createExternalLocation(data: Omit<ExternalLocation, 'id'>): Promise<{ success: true; data: ExternalLocation }> {
   return apiPost('/external-locations', data)
+}
+
+export interface LocationsFlatResponse {
+  success: true
+  data: Array<{ id: string; label: string; buildingName: string; siteName: string }>
+}
+
+export function getLocationsFlat(params: { siteId?: string } = {}): Promise<LocationsFlatResponse> {
+  const qs = toQueryString(params)
+  return apiGet<LocationsFlatResponse>(`/locations${qs}`)
 }

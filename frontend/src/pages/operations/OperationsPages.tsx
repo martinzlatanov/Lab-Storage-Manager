@@ -3,17 +3,107 @@
  * ReceiptPage, MovePage, ExitPage, ReturnPage, ScrapPage, ConsumePage
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft, CheckCircle2, ScanLine, Search, Loader2, AlertTriangle } from 'lucide-react'
 import { Card, CardHeader } from '../../components/ui/Card'
 import { ItemStatusBadge, ItemTypeBadge } from '../../components/ui/StatusBadge'
-import { MOCK_ITEMS } from '../../mock/data'
+import { MOCK_ITEMS, MOCK_EXTERNAL_LOCATIONS } from '../../mock/data'
 import { ItemType, ItemStatus } from '../../types'
+import type { AnyItem } from '../../types'
+import {
+  getItems, getLocationsFlat, getContainers, getExternalLocations,
+  recordReceipt, recordMove, recordExit, recordReturn, recordScrap, recordConsume,
+} from '../../api'
 import clsx from 'clsx'
+
+const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true'
 
 const inputClass =
   'w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition bg-white'
+
+// ── Shared types ─────────────────────────────────────────────────────────────
+
+type LocationOption = { id: string; label: string; buildingName: string; siteName: string }
+type ContainerOption = { id: string; label: string }
+type ExternalLocationOption = { id: string; name: string; city: string; country: string }
+
+// ── Mock data fallbacks ───────────────────────────────────────────────────────
+
+const MOCK_LOCATION_OPTIONS: LocationOption[] = [
+  { id: 'l1', label: 'A-01-01-1', buildingName: 'Main Building', siteName: 'Sofia' },
+  { id: 'l2', label: 'A-01-01-2', buildingName: 'Main Building', siteName: 'Sofia' },
+  { id: 'l3', label: 'A-01-02-1', buildingName: 'Main Building', siteName: 'Sofia' },
+  { id: 'l6', label: 'B-01-01-1', buildingName: 'Main Building', siteName: 'Sofia' },
+  { id: 'l9', label: 'C-01-01-1', buildingName: 'Lab Building', siteName: 'Sofia' },
+  { id: 'l11', label: 'A-01-01-1', buildingName: 'Tech Center', siteName: 'Munich' },
+]
+
+const MOCK_CONTAINER_OPTIONS: ContainerOption[] = [
+  { id: 'c1', label: 'BOX-0001' },
+  { id: 'c2', label: 'BOX-0002' },
+  { id: 'c3', label: 'BOX-0003' },
+  { id: 'c4', label: 'BOX-0004' },
+]
+
+const MOCK_EXTERNAL_OPTS: ExternalLocationOption[] = MOCK_EXTERNAL_LOCATIONS.map(el => ({
+  id: el.id,
+  name: el.name,
+  city: el.city,
+  country: el.country,
+}))
+
+// ── Shared hooks ──────────────────────────────────────────────────────────────
+
+function useLocations() {
+  const [options, setOptions] = useState<LocationOption[]>(USE_MOCKS ? MOCK_LOCATION_OPTIONS : [])
+  useEffect(() => {
+    if (USE_MOCKS) return
+    getLocationsFlat().then(r => setOptions(r.data)).catch(() => {})
+  }, [])
+  return options
+}
+
+function useContainers() {
+  const [options, setOptions] = useState<ContainerOption[]>(USE_MOCKS ? MOCK_CONTAINER_OPTIONS : [])
+  useEffect(() => {
+    if (USE_MOCKS) return
+    getContainers().then(r => setOptions(r.data.map(c => ({ id: c.id, label: c.label })))).catch(() => {})
+  }, [])
+  return options
+}
+
+function useExternalLocations() {
+  const [options, setOptions] = useState<ExternalLocationOption[]>(USE_MOCKS ? MOCK_EXTERNAL_OPTS : [])
+  useEffect(() => {
+    if (USE_MOCKS) return
+    getExternalLocations().then(r => setOptions(r.data.map(el => ({
+      id: el.id,
+      name: el.name,
+      city: el.city,
+      country: el.country,
+    })))).catch(() => {})
+  }, [])
+  return options
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function getItemLocation(item: Record<string, unknown>): string {
+  if (item.location) return (item.location as { label: string }).label
+  if (item.locationLabel) return String(item.locationLabel)
+  if (item.externalLocation) return (item.externalLocation as { name: string }).name
+  if (item.externalLocationName) return String(item.externalLocationName)
+  return '—'
+}
+
+function getItemContainer(item: Record<string, unknown>): string {
+  if (item.container) return (item.container as { label: string }).label
+  if (item.containerLabel) return String(item.containerLabel)
+  return ''
+}
+
+// ── Step indicator ────────────────────────────────────────────────────────────
 
 function StepHeader({ step, total, title }: { step: number; total: number; title: string }) {
   return (
@@ -42,14 +132,32 @@ function StepHeader({ step, total, title }: { step: number; total: number; title
   )
 }
 
+// ── Item search ───────────────────────────────────────────────────────────────
+
 function ItemSearchBox({ onSelect }: { onSelect?: (id: string) => void }) {
   const [query, setQuery] = useState('')
+  const [results, setResults] = useState<AnyItem[]>([])
+  const [loading, setLoading] = useState(false)
 
-  const results = MOCK_ITEMS.filter((i) => {
-    if (!query) return false
-    const q = query.toLowerCase()
-    return i.labIdNumber.toLowerCase().includes(q) || i.id.includes(q)
-  }).slice(0, 5)
+  useEffect(() => {
+    if (!query) { setResults([]); return }
+
+    if (USE_MOCKS) {
+      const q = query.toLowerCase()
+      setResults(
+        MOCK_ITEMS.filter(i =>
+          i.labIdNumber.toLowerCase().includes(q) || i.id.includes(q)
+        ).slice(0, 5)
+      )
+      return
+    }
+
+    setLoading(true)
+    getItems({ search: query, pageSize: 5 })
+      .then(r => setResults(r.data))
+      .catch(() => setResults([]))
+      .finally(() => setLoading(false))
+  }, [query])
 
   return (
     <div className="relative">
@@ -62,8 +170,8 @@ function ItemSearchBox({ onSelect }: { onSelect?: (id: string) => void }) {
           placeholder="Scan barcode or type Lab ID…"
           className={inputClass}
         />
-        <button className="shrink-0 p-2.5 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors text-slate-600">
-          <Search size={16} />
+        <button type="button" className="shrink-0 p-2.5 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors text-slate-600">
+          {loading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
         </button>
       </div>
       {results.length > 0 && (
@@ -72,7 +180,7 @@ function ItemSearchBox({ onSelect }: { onSelect?: (id: string) => void }) {
             <button
               key={item.id}
               type="button"
-              onClick={() => { setQuery(item.labIdNumber); onSelect?.(item.id) }}
+              onClick={() => { setQuery(item.labIdNumber); setResults([]); onSelect?.(item.id) }}
               className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left border-b border-slate-50 last:border-0"
             >
               <div className="flex-1 min-w-0">
@@ -95,18 +203,39 @@ function ItemSearchBox({ onSelect }: { onSelect?: (id: string) => void }) {
 export function ReceiptPage() {
   const [step, setStep] = useState(1)
   const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
   const [selectedItemId, setSelectedItemId] = useState('')
   const [locationId, setLocationId] = useState('')
   const [containerId, setContainerId] = useState('')
   const [notes, setNotes] = useState('')
   const navigate = useNavigate()
+  const locationOptions = useLocations()
+  const containerOptions = useContainers()
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (step < 3) { setStep(s => s + 1); return }
     setSubmitting(true)
-    console.log('Receipt payload:', { selectedItemId, locationId, containerId, notes })
-    setTimeout(() => { setSubmitting(false); navigate('/items') }, 1200)
+    setError('')
+
+    if (USE_MOCKS) {
+      console.log('Receipt payload (mock):', { selectedItemId, locationId, containerId, notes })
+      setTimeout(() => { setSubmitting(false); navigate('/items') }, 1200)
+      return
+    }
+
+    try {
+      await recordReceipt({
+        itemId: selectedItemId,
+        locationId: locationId || undefined,
+        containerId: containerId || undefined,
+        notes: notes || undefined,
+      })
+      navigate('/items')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to record receipt')
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -114,6 +243,10 @@ export function ReceiptPage() {
       <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
         <ArrowLeft size={15} /> Dashboard
       </Link>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-3 text-sm text-red-700">{error}</div>
+      )}
 
       <Card>
         <CardHeader title="Receipt" subtitle="Register item(s) entering the warehouse" />
@@ -149,19 +282,20 @@ export function ReceiptPage() {
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">Location <span className="text-red-500">*</span></label>
                   <select value={locationId} onChange={e => setLocationId(e.target.value)} className={inputClass}>
                     <option value="">— Select location —</option>
-                    <option value="l1">A-01-01-1 (Sofia / Main Building)</option>
-                    <option value="l2">A-01-01-2 (Sofia / Main Building)</option>
-                    <option value="l3">A-01-02-1 (Sofia / Main Building)</option>
-                    <option value="l6">B-01-01-1 (Sofia / Main Building)</option>
+                    {locationOptions.map(loc => (
+                      <option key={loc.id} value={loc.id}>
+                        {loc.label} ({loc.siteName} / {loc.buildingName})
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">Container (optional)</label>
                   <select value={containerId} onChange={e => setContainerId(e.target.value)} className={inputClass}>
                     <option value="">— No container / new box —</option>
-                    <option value="c1">BOX-0001</option>
-                    <option value="c2">BOX-0002</option>
-                    <option value="c3">BOX-0003</option>
+                    {containerOptions.map(c => (
+                      <option key={c.id} value={c.id}>{c.label}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -210,38 +344,79 @@ export function ReceiptPage() {
 
 export function MovePage() {
   const [selectedItemId, setSelectedItemId] = useState('')
+  const [selectedItem, setSelectedItem] = useState<AnyItem | null>(null)
   const [destLocationId, setDestLocationId] = useState('')
   const [destContainerId, setDestContainerId] = useState('')
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
   const navigate = useNavigate()
-  const selectedItem = MOCK_ITEMS.find(i => i.id === selectedItemId)
+  const locationOptions = useLocations()
+  const containerOptions = useContainers()
 
-  function handleSubmit(e: React.FormEvent) {
+  function handleSelectItem(id: string) {
+    setSelectedItemId(id)
+    if (USE_MOCKS) {
+      setSelectedItem(MOCK_ITEMS.find(i => i.id === id) ?? null)
+      return
+    }
+    import('../../api').then(api => {
+      api.getItem(id).then(r => setSelectedItem(r.data)).catch(() => {})
+    })
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitting(true)
-    console.log('Move payload:', { selectedItemId, destLocationId, destContainerId, notes })
-    setTimeout(() => { setSubmitting(false); navigate('/items') }, 1000)
+    setError('')
+
+    if (USE_MOCKS) {
+      console.log('Move payload (mock):', { selectedItemId, destLocationId, destContainerId, notes })
+      setTimeout(() => { setSubmitting(false); navigate('/items') }, 1000)
+      return
+    }
+
+    try {
+      await recordMove({
+        itemId: selectedItemId,
+        toLocationId: destLocationId || undefined,
+        toContainerId: destContainerId || undefined,
+        notes: notes || undefined,
+      })
+      navigate('/items')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to record move')
+      setSubmitting(false)
+    }
   }
+
+  const asAny = selectedItem as Record<string, unknown> | null
 
   return (
     <div className="max-w-2xl space-y-5">
       <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
         <ArrowLeft size={15} /> Dashboard
       </Link>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-3 text-sm text-red-700">{error}</div>
+      )}
+
       <Card>
         <CardHeader title="Move Item" subtitle="Transfer item to a different location or container" />
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Item <span className="text-red-500">*</span></label>
-            <ItemSearchBox onSelect={setSelectedItemId} />
+            <ItemSearchBox onSelect={handleSelectItem} />
           </div>
 
-          {selectedItem && (
+          {selectedItem && asAny && (
             <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
               <p className="text-xs text-slate-500 mb-1">Current location</p>
-              <p className="font-mono text-sm text-slate-800">{selectedItem.locationLabel ?? selectedItem.externalLocationName ?? '—'}</p>
-              {selectedItem.containerLabel && <p className="text-xs text-slate-500 mt-0.5">Container: {selectedItem.containerLabel}</p>}
+              <p className="font-mono text-sm text-slate-800">{getItemLocation(asAny)}</p>
+              {getItemContainer(asAny) && (
+                <p className="text-xs text-slate-500 mt-0.5">Container: {getItemContainer(asAny)}</p>
+              )}
             </div>
           )}
 
@@ -249,12 +424,11 @@ export function MovePage() {
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Destination Location <span className="text-red-500">*</span></label>
             <select value={destLocationId} onChange={e => setDestLocationId(e.target.value)} className={inputClass}>
               <option value="">— Select destination —</option>
-              <option value="l1">A-01-01-1 (Sofia / Main Building)</option>
-              <option value="l2">A-01-01-2 (Sofia / Main Building)</option>
-              <option value="l3">A-01-02-1 (Sofia / Main Building)</option>
-              <option value="l6">B-01-01-1 (Sofia / Main Building)</option>
-              <option value="l9">C-01-01-1 (Sofia / Lab Building)</option>
-              <option value="l11">A-01-01-1 (Munich / Tech Center)</option>
+              {locationOptions.map(loc => (
+                <option key={loc.id} value={loc.id}>
+                  {loc.label} ({loc.siteName} / {loc.buildingName})
+                </option>
+              ))}
             </select>
           </div>
 
@@ -262,9 +436,9 @@ export function MovePage() {
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Destination Container (optional)</label>
             <select value={destContainerId} onChange={e => setDestContainerId(e.target.value)} className={inputClass}>
               <option value="">— No container —</option>
-              <option value="c1">BOX-0001</option>
-              <option value="c2">BOX-0002</option>
-              <option value="c6">BOX-0006 (Munich)</option>
+              {containerOptions.map(c => (
+                <option key={c.id} value={c.id}>{c.label}</option>
+              ))}
             </select>
           </div>
 
@@ -275,7 +449,7 @@ export function MovePage() {
 
           <div className="flex justify-end gap-3 pt-2">
             <Link to="/" className="px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 hover:bg-slate-50">Cancel</Link>
-            <button type="submit" disabled={submitting}
+            <button type="submit" disabled={submitting || !selectedItemId}
               className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors">
               {submitting ? <><Loader2 size={14} className="animate-spin" /> Moving…</> : 'Confirm Move'}
             </button>
@@ -294,13 +468,33 @@ export function ExitPage() {
   const [expectedReturnDate, setExpectedReturnDate] = useState('')
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
   const navigate = useNavigate()
+  const externalOptions = useExternalLocations()
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitting(true)
-    console.log('Exit payload:', { selectedItemId, externalLocationId, expectedReturnDate, notes })
-    setTimeout(() => { setSubmitting(false); navigate('/items') }, 1000)
+    setError('')
+
+    if (USE_MOCKS) {
+      console.log('Exit payload (mock):', { selectedItemId, externalLocationId, expectedReturnDate, notes })
+      setTimeout(() => { setSubmitting(false); navigate('/items') }, 1000)
+      return
+    }
+
+    try {
+      await recordExit({
+        itemId: selectedItemId,
+        toExternalLocationId: externalLocationId,
+        expectedReturnDate: expectedReturnDate ? new Date(expectedReturnDate).toISOString() : undefined,
+        notes: notes || undefined,
+      })
+      navigate('/items')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to record exit')
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -308,6 +502,11 @@ export function ExitPage() {
       <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
         <ArrowLeft size={15} /> Dashboard
       </Link>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-3 text-sm text-red-700">{error}</div>
+      )}
+
       <Card>
         <CardHeader title="Temporary Exit" subtitle="Send item to an external location" />
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
@@ -319,9 +518,9 @@ export function ExitPage() {
             <label className="block text-sm font-medium text-slate-700 mb-1.5">External Location <span className="text-red-500">*</span></label>
             <select value={externalLocationId} onChange={e => setExternalLocationId(e.target.value)} className={inputClass}>
               <option value="">— Select external location —</option>
-              <option value="el1">BMW Test Center (Munich, Germany)</option>
-              <option value="el2">IDIADA Testing Lab (Santa Oliva, Spain)</option>
-              <option value="el3">TÜV Rheinland (Cologne, Germany)</option>
+              {externalOptions.map(el => (
+                <option key={el.id} value={el.id}>{el.name} ({el.city}, {el.country})</option>
+              ))}
             </select>
           </div>
           <div>
@@ -334,7 +533,7 @@ export function ExitPage() {
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <Link to="/" className="px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 hover:bg-slate-50">Cancel</Link>
-            <button type="submit" disabled={submitting}
+            <button type="submit" disabled={submitting || !selectedItemId || !externalLocationId}
               className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 disabled:opacity-60 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors">
               {submitting ? <><Loader2 size={14} className="animate-spin" /> Processing…</> : 'Confirm Exit'}
             </button>
@@ -349,23 +548,55 @@ export function ExitPage() {
 
 export function ReturnPage() {
   const [selectedItemId, setSelectedItemId] = useState('')
+  const [selectedItem, setSelectedItem] = useState<AnyItem | null>(null)
   const [returnLocationId, setReturnLocationId] = useState('')
   const [returnContainerId, setReturnContainerId] = useState('')
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
   const navigate = useNavigate()
+  const locationOptions = useLocations()
+  const containerOptions = useContainers()
 
-  const selectedItem = MOCK_ITEMS.find(i => i.id === selectedItemId)
+  function handleSelectItem(id: string) {
+    setSelectedItemId(id)
+    if (USE_MOCKS) {
+      setSelectedItem(MOCK_ITEMS.find(i => i.id === id) ?? null)
+      return
+    }
+    import('../../api').then(api => {
+      api.getItem(id).then(r => setSelectedItem(r.data)).catch(() => {})
+    })
+  }
+
   const isOverdue =
     selectedItem?.status === ItemStatus.TEMP_EXIT &&
     selectedItem?.expectedReturnDate != null &&
     new Date(selectedItem.expectedReturnDate) < new Date()
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitting(true)
-    console.log('Return payload:', { selectedItemId, returnLocationId, returnContainerId, notes })
-    setTimeout(() => { setSubmitting(false); navigate('/items') }, 1000)
+    setError('')
+
+    if (USE_MOCKS) {
+      console.log('Return payload (mock):', { selectedItemId, returnLocationId, returnContainerId, notes })
+      setTimeout(() => { setSubmitting(false); navigate('/items') }, 1000)
+      return
+    }
+
+    try {
+      await recordReturn({
+        itemId: selectedItemId,
+        toLocationId: returnLocationId || undefined,
+        toContainerId: returnContainerId || undefined,
+        notes: notes || undefined,
+      })
+      navigate('/items')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to record return')
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -373,12 +604,17 @@ export function ReturnPage() {
       <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
         <ArrowLeft size={15} /> Dashboard
       </Link>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-3 text-sm text-red-700">{error}</div>
+      )}
+
       <Card>
         <CardHeader title="Return (Scan-in)" subtitle="Scan item back into storage" />
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Scan Item <span className="text-red-500">*</span></label>
-            <ItemSearchBox onSelect={setSelectedItemId} />
+            <ItemSearchBox onSelect={handleSelectItem} />
           </div>
 
           {selectedItem && isOverdue && (
@@ -397,17 +633,20 @@ export function ReturnPage() {
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Assign to Location <span className="text-red-500">*</span></label>
                 <select value={returnLocationId} onChange={e => setReturnLocationId(e.target.value)} className={inputClass}>
                   <option value="">— Select storage location —</option>
-                  <option value="l1">A-01-01-1 (Sofia / Main Building)</option>
-                  <option value="l2">A-01-01-2 (Sofia / Main Building)</option>
-                  <option value="l3">A-01-02-1 (Sofia / Main Building)</option>
+                  {locationOptions.map(loc => (
+                    <option key={loc.id} value={loc.id}>
+                      {loc.label} ({loc.siteName} / {loc.buildingName})
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Container (optional)</label>
                 <select value={returnContainerId} onChange={e => setReturnContainerId(e.target.value)} className={inputClass}>
                   <option value="">— No container —</option>
-                  <option value="c1">BOX-0001</option>
-                  <option value="c2">BOX-0002</option>
+                  {containerOptions.map(c => (
+                    <option key={c.id} value={c.id}>{c.label}</option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -434,19 +673,45 @@ export function ReturnPage() {
 
 export function ScrapPage() {
   const [selectedItemId, setSelectedItemId] = useState('')
+  const [selectedItem, setSelectedItem] = useState<AnyItem | null>(null)
   const [scrapReason, setScrapReason] = useState('')
   const [confirmed, setConfirmed] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
   const navigate = useNavigate()
 
-  const selectedItem = MOCK_ITEMS.find(i => i.id === selectedItemId)
+  function handleSelectItem(id: string) {
+    setSelectedItemId(id)
+    if (USE_MOCKS) {
+      setSelectedItem(MOCK_ITEMS.find(i => i.id === id) ?? null)
+      return
+    }
+    import('../../api').then(api => {
+      api.getItem(id).then(r => setSelectedItem(r.data)).catch(() => {})
+    })
+  }
 
-  function handleSubmit(e: React.FormEvent) {
+  const asAny = selectedItem as Record<string, unknown> | null
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!confirmed) return
     setSubmitting(true)
-    console.log('Scrap payload:', { selectedItemId, scrapReason })
-    setTimeout(() => { setSubmitting(false); navigate('/items') }, 1000)
+    setError('')
+
+    if (USE_MOCKS) {
+      console.log('Scrap payload (mock):', { selectedItemId, scrapReason })
+      setTimeout(() => { setSubmitting(false); navigate('/items') }, 1000)
+      return
+    }
+
+    try {
+      await recordScrap({ itemId: selectedItemId, notes: scrapReason || undefined })
+      navigate('/items')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to scrap item')
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -454,22 +719,27 @@ export function ScrapPage() {
       <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
         <ArrowLeft size={15} /> Dashboard
       </Link>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-3 text-sm text-red-700">{error}</div>
+      )}
+
       <Card>
         <CardHeader title="Scrap Item" subtitle="Mark item as permanently scrapped — cannot be undone" />
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Item <span className="text-red-500">*</span></label>
-            <ItemSearchBox onSelect={setSelectedItemId} />
+            <ItemSearchBox onSelect={handleSelectItem} />
           </div>
 
-          {selectedItem && (
+          {selectedItem && asAny && (
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-2">
                 <ItemTypeBadge type={selectedItem.itemType} />
                 <ItemStatusBadge status={selectedItem.status} />
               </div>
               <p className="font-mono text-sm font-medium text-slate-800">{selectedItem.labIdNumber}</p>
-              <p className="text-xs text-slate-500 mt-1">{selectedItem.locationLabel ?? selectedItem.externalLocationName ?? 'Unknown location'}</p>
+              <p className="text-xs text-slate-500 mt-1">{getItemLocation(asAny)}</p>
             </div>
           )}
 
@@ -516,17 +786,48 @@ export function ScrapPage() {
 export function ConsumePage() {
   const [selectedItemId, setSelectedItemId] = useState('')
   const [qty, setQty] = useState('')
+  const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+  const [consumables, setConsumables] = useState<AnyItem[]>(
+    USE_MOCKS
+      ? MOCK_ITEMS.filter(i => i.itemType === ItemType.CONSUMABLE && i.status !== ItemStatus.DEPLETED)
+      : [],
+  )
   const navigate = useNavigate()
 
-  const consumables = MOCK_ITEMS.filter(i => i.itemType === ItemType.CONSUMABLE && i.status !== ItemStatus.DEPLETED)
-  const selectedItem = consumables.find(i => i.id === selectedItemId) as { quantity: number; unit: string; labIdNumber: string; consumableType: string } | undefined
+  useEffect(() => {
+    if (USE_MOCKS) return
+    getItems({ itemType: ItemType.CONSUMABLE, pageSize: 100 })
+      .then(r => setConsumables(r.data.filter(i => i.status !== ItemStatus.DEPLETED)))
+      .catch(() => {})
+  }, [])
 
-  function handleSubmit(e: React.FormEvent) {
+  type ConsumableView = { quantity: number; unit: string; labIdNumber: string; consumableType: string }
+  const selectedItem = consumables.find(i => i.id === selectedItemId) as (AnyItem & ConsumableView) | undefined
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitting(true)
-    console.log('Consume payload:', { selectedItemId, qty })
-    setTimeout(() => { setSubmitting(false); navigate('/items') }, 1000)
+    setError('')
+
+    if (USE_MOCKS) {
+      console.log('Consume payload (mock):', { selectedItemId, qty })
+      setTimeout(() => { setSubmitting(false); navigate('/items') }, 1000)
+      return
+    }
+
+    try {
+      await recordConsume({
+        itemId: selectedItemId,
+        quantityConsumed: parseFloat(qty),
+        notes: notes || undefined,
+      })
+      navigate('/items')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to record consumption')
+      setSubmitting(false)
+    }
   }
 
   const qtyNum = parseFloat(qty)
@@ -537,6 +838,11 @@ export function ConsumePage() {
       <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
         <ArrowLeft size={15} /> Dashboard
       </Link>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-3 text-sm text-red-700">{error}</div>
+      )}
+
       <Card>
         <CardHeader title="Consume" subtitle="Record consumable usage and update quantity" />
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
@@ -545,7 +851,7 @@ export function ConsumePage() {
             <select className={inputClass} value={selectedItemId} onChange={e => setSelectedItemId(e.target.value)}>
               <option value="">— Select consumable —</option>
               {consumables.map(c => {
-                const con = c as { labIdNumber: string; consumableType: string; quantity: number; unit: string }
+                const con = c as AnyItem & ConsumableView
                 return (
                   <option key={c.id} value={c.id}>
                     {con.labIdNumber} — {con.consumableType} ({con.quantity} {con.unit} remaining)
@@ -591,7 +897,7 @@ export function ConsumePage() {
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Notes</label>
-            <textarea rows={2} className={clsx(inputClass, 'resize-none')} placeholder="Test batch number, usage purpose…" />
+            <textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} className={clsx(inputClass, 'resize-none')} placeholder="Test batch number, usage purpose…" />
           </div>
 
           <div className="flex justify-end gap-3 pt-2">

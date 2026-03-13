@@ -224,6 +224,27 @@ export default async function sitesRoutes(app: FastifyInstance) {
     }
   );
 
+  // GET /api/v1/locations (flat list — for dropdowns)
+  app.get(
+    "/locations",
+    { preHandler: [app.authenticate] },
+    async (_req, reply) => {
+      const locations = await prisma.storageLocation.findMany({
+        orderBy: { label: "asc" },
+        include: {
+          storageArea: { include: { building: { include: { site: true } } } },
+        },
+      });
+      const data = locations.map((loc) => ({
+        id: loc.id,
+        label: loc.label,
+        buildingName: loc.storageArea.building.name,
+        siteName: loc.storageArea.building.site.name,
+      }));
+      return reply.send({ success: true, data });
+    }
+  );
+
   // GET /api/v1/locations/:locationId
   app.get(
     "/locations/:locationId",
