@@ -127,7 +127,7 @@ See `DECISIONS.md` for full log.
 - [x] Database seed script (`prisma/seed.ts`)
 - [x] Initial migration SQL (`prisma/migration_init.sql`)
 - [x] Frontend-Backend integration (API client + major pages wired)
-- [ ] Remaining page wiring (AddItemPage, OperationsPages, ReportsPages)
+- [x] Remaining page wiring (AddItemPage, OperationsPages, ReportsPages)
 - [ ] Label print service hardware integration
 - [ ] Barcode scan input handling (web + Android)
 
