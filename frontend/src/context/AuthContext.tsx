@@ -16,9 +16,13 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(() => {
-    // Restore user from localStorage on mount
+    // Restore user from localStorage on mount — only if access_token also exists
     const stored = localStorage.getItem('auth_user')
-    return stored ? JSON.parse(stored) : null
+    const token = localStorage.getItem('access_token')
+    if (stored && token) return JSON.parse(stored)
+    // Token is missing — clear stale user data
+    localStorage.removeItem('auth_user')
+    return null
   })
   const [isLoading, setIsLoading] = useState(false)
 

@@ -315,7 +315,7 @@ export function ItemListPage() {
                   {filteredAndSorted.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="text-center py-12 text-slate-400">
-                        No items match your search.
+                        {error ? 'Failed to load items.' : 'No items match your search.'}
                       </td>
                     </tr>
                   ) : (

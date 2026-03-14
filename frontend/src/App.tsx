@@ -1,6 +1,6 @@
 import { Component, type ReactNode } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider } from './context/AuthContext'
+import { AuthProvider, useAuth } from './context/AuthContext'
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null }
@@ -55,6 +55,24 @@ import {
   SystemSettingsPage,
 } from './pages/admin/AdminPages'
 
+function NotFoundPage() {
+  return (
+    <div className="flex flex-col items-center justify-center h-full py-24 text-center">
+      <p className="text-6xl font-bold text-slate-200 mb-4">404</p>
+      <p className="text-lg font-semibold text-slate-700 mb-1">Page not found</p>
+      <p className="text-sm text-slate-500 mb-6">The page you're looking for doesn't exist.</p>
+      <Navigate to="/" replace />
+    </div>
+  )
+}
+
+function ProtectedRoute({ children }: { children: ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuth()
+  if (isLoading) return null
+  if (!isAuthenticated) return <Navigate to="/login" replace />
+  return <>{children}</>
+}
+
 export default function App() {
   return (
     <AuthProvider>
@@ -64,7 +82,7 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
 
         {/* App shell wraps all authenticated routes */}
-        <Route element={<ErrorBoundary><AppShell /></ErrorBoundary>}>
+        <Route element={<ProtectedRoute><ErrorBoundary><AppShell /></ErrorBoundary></ProtectedRoute>}>
           <Route path="/" element={<DashboardPage />} />
 
           {/* Items */}
@@ -100,8 +118,8 @@ export default function App() {
           <Route path="/admin/external-locations" element={<ExternalLocationAdminPage />} />
           <Route path="/admin/settings" element={<SystemSettingsPage />} />
 
-          {/* Fallback */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+          {/* Fallback — 404 */}
+          <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

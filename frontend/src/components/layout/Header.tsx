@@ -1,4 +1,4 @@
-import { Bell, ScanLine } from 'lucide-react'
+import { Bell, ScanLine, Menu } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
 
 const ROUTE_TITLES: Record<string, string> = {
@@ -35,12 +35,20 @@ function getTitle(pathname: string): string {
   return 'Lab Storage Manager'
 }
 
-export function Header() {
+export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const location = useLocation()
   const title = getTitle(location.pathname)
 
   return (
-    <header className="sticky top-0 z-10 bg-white border-b border-slate-200 px-6 py-3 flex items-center gap-4">
+    <header className="sticky top-0 z-10 bg-white border-b border-slate-200 px-4 lg:px-6 py-3 flex items-center gap-4">
+      <button
+        type="button"
+        onClick={onMenuClick}
+        className="lg:hidden p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+        aria-label="Toggle menu"
+      >
+        <Menu size={20} />
+      </button>
       <h1 className="text-base font-semibold text-slate-800 flex-1">{title}</h1>
 
       {/* Quick scan / search */}

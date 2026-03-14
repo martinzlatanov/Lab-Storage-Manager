@@ -210,7 +210,7 @@ function ConsumableForm({ fields, setField }: {
         <input type="text" name="labIdNumber" value={fields.labIdNumber ?? ''} onChange={e => setField('labIdNumber', e.target.value)} placeholder="CON-2026-001" className={clsx(inputClass, 'font-mono')} />
       </FormField>
       <FormField label="Quantity" required>
-        <input type="number" name="quantity" min="0" step="0.01" value={fields.quantity ?? ''} onChange={e => setField('quantity', e.target.value)} placeholder="0.00" className={inputClass} />
+        <input type="number" name="quantity" min="0.01" step="0.01" value={fields.quantity ?? ''} onChange={e => setField('quantity', e.target.value)} placeholder="0.00" className={inputClass} />
       </FormField>
       <FormField label="Unit" required>
         <input type="text" name="unit" value={fields.unit ?? ''} onChange={e => setField('unit', e.target.value)} placeholder="kg, L, pcs…" className={inputClass} />

@@ -1,7 +1,7 @@
 // ─── API Client Base ──────────────────────────────────────────────────────────
 // Centralized fetch wrapper with JWT auth, auto-refresh, and error handling.
 
-const BASE_URL = '/api/v1'
+const BASE_URL = import.meta.env.VITE_API_URL ?? '/api/v1'
 
 /** Retrieve the stored access token. */
 function getAccessToken(): string | null {
@@ -93,7 +93,12 @@ export async function apiFetch<T>(
     }
   }
 
-  const json = await res.json()
+  let json: any
+  try {
+    json = await res.json()
+  } catch {
+    throw new ApiError(`Server error (${res.status})`, res.status)
+  }
 
   if (!res.ok || json.success === false) {
     throw new ApiError(json.error ?? 'Request failed', res.status)

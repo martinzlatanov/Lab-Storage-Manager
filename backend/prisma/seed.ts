@@ -556,7 +556,7 @@ async function main() {
       create: op,
     });
   }
-  console.log(`    ✓ ${operations.length} operations`); // 12 total
+  console.log(`    ✓ ${operations.length} operations`);
 
   console.log("\n✅ Seed complete!\n");
 }
