@@ -2,6 +2,7 @@ import fp from "fastify-plugin";
 import jwt from "@fastify/jwt";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import type { JwtPayload, RequestUser, UserRole } from "../types/index.js";
+import { prisma } from "../lib/prisma.js";
 
 // Extend @fastify/jwt's own interface — the correct way to type request.user
 declare module "@fastify/jwt" {
@@ -37,6 +38,8 @@ export default fp(async function authPlugin(app: FastifyInstance) {
     },
   });
 
+  const isProduction = process.env.NODE_ENV === "production";
+
   // ── authenticate decorator ───────────────────────────────────────────────
   app.decorate(
     "authenticate",
@@ -50,6 +53,19 @@ export default fp(async function authPlugin(app: FastifyInstance) {
           siteId: payload.siteId,
         };
       } catch {
+        // Local-dev fallback: allow requests without JWT when not in production.
+        if (!isProduction) {
+          const devUser = await prisma.user.findUnique({ where: { ldapUsername: "mzlatanov" } });
+          if (devUser && devUser.isActive) {
+            req.user = {
+              id: devUser.id,
+              username: devUser.ldapUsername,
+              role: devUser.role as RequestUser["role"],
+              siteId: devUser.siteId ?? undefined,
+            };
+            return;
+          }
+        }
         return reply.status(401).send({ success: false, error: "Unauthorized" });
       }
     }

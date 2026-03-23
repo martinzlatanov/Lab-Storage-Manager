@@ -1,7 +1,8 @@
 // ─── API Client Base ──────────────────────────────────────────────────────────
 // Centralized fetch wrapper with JWT auth, auto-refresh, and error handling.
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? '/api/v1'
+const configuredBaseUrl = (import.meta.env.VITE_API_URL ?? '').trim()
+const BASE_URL = configuredBaseUrl.length > 0 ? configuredBaseUrl : '/api/v1'
 
 /** Retrieve the stored access token. */
 function getAccessToken(): string | null {

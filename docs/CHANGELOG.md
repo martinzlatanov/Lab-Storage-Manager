@@ -8,6 +8,10 @@
 
 ## [Unreleased]
 
+### Fixed
+- `frontend/src/api/client.ts` and `frontend/N.Mitev/src/api/client.ts`: treat empty `VITE_API_URL` as unset and correctly fall back to `/api/v1`; this fixes the Items page error banner `Server error (200)` caused by requests going to the frontend HTML route instead of the API
+- `backend/src/plugins/auth.ts`: added a non-production fallback user resolution to align local development behavior with the frontend dev-auth bypass and allow protected API routes to load during local testing
+
 ### Planned
 - Remaining page wiring (AddItemPage, OperationsPages, ReportsPages)
 - Barcode scan input handling (web + Android)
