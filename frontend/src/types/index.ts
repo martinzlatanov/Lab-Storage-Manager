@@ -114,6 +114,7 @@ export interface ExternalLocation {
 export interface Container {
   id: string
   label: string
+  barcode: string
   locationId?: string
   locationLabel?: string
   externalLocationId?: string
@@ -127,6 +128,7 @@ export interface BaseItem {
   id: string
   itemType: ItemType
   status: ItemStatus
+  barcode: string
   containerId?: string
   containerLabel?: string
   locationId?: string
@@ -157,7 +159,7 @@ export interface ElectronicsSample extends BaseItem {
 
 export interface Fixture extends BaseItem {
   itemType: 'FIXTURE'
-  fixtureTypes: FixtureType[]
+  fixtureCategories: FixtureType[]
   productName: string
   pictureUrl?: string
 }
@@ -185,8 +187,8 @@ export interface Consumable extends BaseItem {
 
 export interface MiscItem extends BaseItem {
   itemType: 'MISC'
-  name: string
-  description?: string
+  miscName: string
+  miscDescription?: string
 }
 
 export type AnyItem = ElectronicsSample | Fixture | SparePart | Consumable | MiscItem

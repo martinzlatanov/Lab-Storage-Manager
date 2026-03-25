@@ -3,14 +3,14 @@
 > **Paste this file at the start of every Claude session to restore full context.**
 
 ## Status
-`In Development` — Pre-scaffold phase
+`In Development` — Backend fully implemented. Frontend integration in progress. Location dropdown auto-refresh implemented.
 
 ## Team
 - Martin (developer)
-- Venelin Lab manager (domain expert / co-developer)
+- Venelin (lab manager / domain expert / co-developer)
 
 ## Last Updated
-2026-03-10
+2026-03-25
 
 ---
 
@@ -108,28 +108,43 @@ See `DECISIONS.md` for full log.
 
 ---
 
-## Next Steps (Ordered)
+## Next Steps (Remaining)
 
-- [x] TypeScript type definitions (`TYPES.md` → `src/shared/types/`)
+### Phase 3: Testing & Hardware Integration (In Progress)
+- [ ] **Hardware label printing** — integrate actual printer drivers (Zebra ZPL / Citizen / Brother)
+- [ ] **Barcode scanner input handling** — web form submit + Android terminal integration
+- [ ] **UI/UX refinement** — operations pages (Move, Receipt, Exit, Return, Scrap, Consume)
+- [ ] **API error handling** — standardize responses, retry logic, validation messages
+- [ ] **Frontend form validation** — schema-based validation for all add/edit forms
+
+### Phase 4: QA & Deployment
+- [ ] **Full system testing** — operations workflows, edge cases
+- [ ] **Performance optimization** — API query optimization, frontend bundle size
+- [ ] **Deployment runbook** — DEPLOYMENT.md completion + smoke tests
+- [ ] **User training materials** — screenshots, walkthrough videos
+- [ ] **LDAP integration testing** — with real Visteon AD (development: fallback mode active)
+- [ ] **Containerization** — Docker Compose validation on Linux server
+
+### Completed
+- [x] TypeScript type definitions (` const` enums pattern, `src/shared/types/`)
 - [x] Screen inventory (`SCREENS.md`)
 - [x] Prisma schema init (`prisma/schema.prisma`)
 - [x] Docker Compose setup (`docker-compose.yml`)
-- [x] Backend scaffolded (Fastify + TS)
-- [x] Frontend scaffolded (React + Vite + routing)
-- [x] Mock data system implementation
-- [x] Item List & Detail screens
-- [x] Location Browser & Container Manager
-- [x] Label printing preview system
-- [x] **Bugfixes: Print Label buttons connection**
-- [x] **Feature: Sortable Item List table**
-- [x] Backend API routes implemented (items, operations, sites, containers, users, reports, auth)
-- [x] LDAP/JWT auth implementation (backend plugin + route)
-- [x] Database seed script (`prisma/seed.ts`)
-- [x] Initial migration SQL (`prisma/migration_init.sql`)
-- [x] Frontend-Backend integration (API client + major pages wired)
-- [x] Remaining page wiring (AddItemPage, OperationsPages, ReportsPages)
-- [ ] Label print service hardware integration
-- [ ] Barcode scan input handling (web + Android)
+- [x] Backend scaffolded with Fastify + TS
+- [x] Frontend scaffolded with React + Vite + routing
+- [x] Mock data system for frontend development
+- [x] Database seed script + initial migration SQL
+- [x] **Backend API routes** — all CRUD routes for items, operations, sites, containers, users, reports
+- [x] **LDAP/JWT authentication** — backend plugin + login route
+- [x] **Frontend-Backend integration** — API client layer + AuthContext
+- [x] **Major pages wired to API** — Items, Dashboard, Storage, Labels  
+- [x] **Admin route protection** — `AdminRoute` component + role-based access control
+- [x] **API client improvements** — fallback to `/api/v1` when `VITE_API_URL` is empty- [x] **Location dropdown auto-refresh** — 5-second polling in AddItemPage & OperationsPages for real-time admin sync
+- [x] **Edit item** — EditItemPage with pre-populated type-specific forms, accessible via Edit button on ItemDetailPage
+- [x] **Backend security fix** — dev auth fallback gated behind `NODE_ENV === "development"` (BUG-001)
+- [x] **Audit trail on item create** — RECEIPT OperationRecord created atomically in `$transaction` for all 5 item types when location is supplied (BUG-005)
+- [x] **Move/Receipt validation** — Move requires at least one destination; Receipt requires at least one location (BUG-008, BUG-009)
+- [x] **Lab ID editable via API** — `labIdNumber` added to `UpdateItemBody` schema so PATCH persists changes (BUG-010)
 
 ---
 

@@ -5,6 +5,67 @@
 
 ---
 
+## 2026-03-24 — Location Dropdown Auto-Refresh Polling
+
+**Decision:** Implement 5-second client-side polling for location dropdowns in AddItemPage and OperationsPages to automatically reflect newly created locations from Admin Locations Config page.
+
+**Problem:** When admins created a new location in `/admin/locations`, the location dropdown in item add/operation forms did not update until the user manually refreshed the page.
+
+**Alternatives considered:**
+- Option A (chosen): 5-second polling interval via `setInterval()` in useEffect cleanup — simple, no infrastructure needed, good UX for typical admin workflows (create 1-2 locations then navigate to item form)
+- Option B: WebSocket/server-sent events — adds backend complexity, requires persistent connections, overkill for warehouse management UI (not real-time critical)
+- Option C: Manual refresh button — minimal code but requires user action, poor UX, defeats purpose of admin workflow efficiency
+- Option D: On-demand refresh via navigation event — requires route transition hooks, complex state management, misses case where user opens new tab to item form
+
+**Rationale:**
+- 5-second interval balances responsiveness vs. API load: admin operations are infrequent, polling is lightweight
+- Users expect dropdown state to reflect backend after admin creates location; polling satisfies this without explicit action
+- Polling cleanup via interval return prevents memory leaks across component unmounts
+- Dual implementation (AddItemPage + OperationsPages) with shared pattern ensures consistency across all item/operation workflows
+- Non-blocking: polling runs silently in background, doesn't block form submission or user interaction
+- No backend changes required; leverages existing `GET /api/v1/locations` endpoint
+
+**Implementation details:**
+- `AddItemPage.tsx`: created `refreshLocations()` async function, setup auto-refresh in first useEffect with interval cleanup
+- `OperationsPages.tsx`: added polling logic to `useLocations()` custom hook, centralized for Receipt/Move/Exit/Return/etc.
+- `N.Mitev/` variants: applied identical pattern to maintain feature parity across frontend branches
+
+**Future considerations:**
+- If location creation becomes high-frequency (bulk import), consider increasing interval to 10s or switching to on-demand refresh button
+- Monitor API load during peak admin usage; may need to add debounce if endpoint becomes bottleneck
+- If WebSocket infrastructure is later added for other features (real-time item tracking), migrate to event-driven location updates
+
+---
+
+## 2026-03-24 — Role-Based Route Protection & Location Hierarchy Discoverability
+
+**Decision:** Implement `AdminRoute` guard component to enforce admin-only access to `/admin/*` paths. Add admin-only CTA in Location Browser (Storage page) linking to Location Configuration (Admin page).
+
+**Alternatives considered:**
+- Option A (chosen): Admin-only CTA button/link from storage page to admin config — clearer domain separation, lower complexity, admin users discover URL naturally from browsing context
+- Option B: Embed add-form components directly in storage browser page — higher complexity, code duplication, blurs boundary between browsing and management
+- Option C: Show disabled placeholder buttons for non-admin users — clutters UI without value
+
+**Rationale:**
+- Location hierarchy management (add/edit sites, buildings, areas, locations) is admin-exclusive and should be behind both UI and route-level access control
+- Separating browsing (`/storage/locations`) from management (`/admin/locations`) keeps the information architecture clear
+- Route-level guard prevents URL-based access bypass: non-admin users attempting to navigate directly to `/admin/*` are redirected to home page
+- Sidebar role filtering provides UX-level hiding, but route guard provides security-level enforcement
+- Admin-only CTA in Location Browser makes the management interface discoverable without cluttering the browse-only view for non-admin users
+- Blue info box styling signals "admin exclusive" without being aggressive
+
+**Implementation details:**
+- `AdminRoute` component in App.tsx checks `user.role === UserRole.ADMIN` and renders either children or `<Navigate to="/" />`
+- All four admin routes (`/admin/users`, `/admin/locations`, `/admin/external-locations`, `/admin/settings`) wrapped with `<AdminRoute>`
+- Location Browser renders admin-only banner only when `user?.role === UserRole.ADMIN`, providing one-click navigation to `/admin/locations`
+- No backend changes required; frontend-only enforcement (backend will enforce via JWT role claim when implemented)
+
+**Future considerations:**
+- If User role gains location hierarchy creation rights in future, introduce granular permissions (`create_location_hierarchy`) instead of widening admin access globally
+- Ensure backend mirrors role checks once API mutations are live
+
+---
+
 ## 2026-03-10 — Barcode Format
 
 **Decision:** Code 128 (1D) + QR Code (2D)

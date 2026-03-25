@@ -38,8 +38,6 @@ export default fp(async function authPlugin(app: FastifyInstance) {
     },
   });
 
-  const isProduction = process.env.NODE_ENV === "production";
-
   // ── authenticate decorator ───────────────────────────────────────────────
   app.decorate(
     "authenticate",
@@ -53,8 +51,9 @@ export default fp(async function authPlugin(app: FastifyInstance) {
           siteId: payload.siteId,
         };
       } catch {
-        // Local-dev fallback: allow requests without JWT when not in production.
-        if (!isProduction) {
+        // Dev-only fallback: allow requests without JWT by using the seeded dev user.
+        // Only active in NODE_ENV=development — never reaches production paths.
+        if (process.env.NODE_ENV === "development") {
           const devUser = await prisma.user.findUnique({ where: { ldapUsername: "mzlatanov" } });
           if (devUser && devUser.isActive) {
             req.user = {

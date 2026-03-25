@@ -59,7 +59,13 @@ function useLocations() {
   const [options, setOptions] = useState<LocationOption[]>(USE_MOCKS ? MOCK_LOCATION_OPTIONS : [])
   useEffect(() => {
     if (USE_MOCKS) return
-    getLocationsFlat().then(r => setOptions(r.data)).catch(() => {})
+    const refreshLocations = () => {
+      getLocationsFlat().then(r => setOptions(r.data)).catch(() => {})
+    }
+    refreshLocations()
+    // Auto-refresh every 5 seconds to pick up new locations from admin
+    const interval = setInterval(refreshLocations, 5000)
+    return () => clearInterval(interval)
   }, [])
   return options
 }

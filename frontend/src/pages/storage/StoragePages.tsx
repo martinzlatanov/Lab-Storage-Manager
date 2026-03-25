@@ -3,8 +3,10 @@
  * LocationBrowserPage, ContainerManagerPage, ExternalLocationsPage
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
+import { UserRole } from '../../types'
 import {
   ChevronRight,
   MapPin,
@@ -18,12 +20,13 @@ import {
   Mail,
   AlertTriangle,
   Loader2,
+  X,
 } from 'lucide-react'
 import { Card, CardHeader } from '../../components/ui/Card'
 import { ItemStatusBadge, ItemTypeBadge } from '../../components/ui/StatusBadge'
 import { MOCK_SITES, MOCK_CONTAINERS, MOCK_EXTERNAL_LOCATIONS, MOCK_ITEMS } from '../../mock/data'
 import { ItemStatus, type AnyItem, type Site, type Container, type ExternalLocation } from '../../types'
-import { getSites as apiGetSites, getExternalLocations as apiGetExtLocs, getItems as apiGetItems, getContainers as apiGetContainers } from '../../api'
+import { getSitesTree as apiGetSitesTree, getExternalLocations as apiGetExtLocs, getItems as apiGetItems, getContainers as apiGetContainers, createContainer as apiCreateContainer } from '../../api'
 import clsx from 'clsx'
 
 const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true'
@@ -31,6 +34,7 @@ const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true'
 // ─── Location Browser ─────────────────────────────────────────────────────────
 
 export function LocationBrowserPage() {
+  const { user } = useAuth()
   const [sites, setSites] = useState<Site[]>(USE_MOCKS ? MOCK_SITES : [])
   const [allItems, setAllItems] = useState<AnyItem[]>(USE_MOCKS ? MOCK_ITEMS : [])
   const [loading, setLoading] = useState(!USE_MOCKS)
@@ -44,12 +48,12 @@ export function LocationBrowserPage() {
     const load = async () => {
       setLoading(true)
       try {
-        const [sitesRes, itemsRes] = await Promise.all([
-          apiGetSites(),
+        const [sitesRes, itemsRes] = await Promise.allSettled([
+          apiGetSitesTree(),
           apiGetItems({ pageSize: 500 }),
         ])
-        setSites(sitesRes.data as any)
-        setAllItems(itemsRes.data)
+        if (sitesRes.status === 'fulfilled') setSites(sitesRes.value.data as Site[])
+        if (itemsRes.status === 'fulfilled') setAllItems(itemsRes.value.data)
       } catch { /* fallback empty */ }
       finally { setLoading(false) }
     }
@@ -76,6 +80,21 @@ export function LocationBrowserPage() {
 
   return (
     <div className="space-y-5">
+      {/* Admin-only location hierarchy management */}
+      {user?.role === UserRole.ADMIN && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <p className="text-sm text-blue-900 mb-2">
+            <span className="font-semibold">Admin:</span> Need to add or edit sites, buildings, or areas?
+          </p>
+          <Link
+            to="/admin/locations"
+            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          >
+            Manage Location Hierarchy
+          </Link>
+        </div>
+      )}
+
       {/* Breadcrumb */}
       <div className="flex items-center gap-1.5 text-sm text-slate-500">
         <span className="hover:text-slate-700 cursor-pointer" onClick={() => { setSelectedSiteId(null); setSelectedBuildingId(null); setSelectedAreaId(null); setSelectedLocationId(null) }}>
@@ -266,29 +285,179 @@ export function LocationBrowserPage() {
   )
 }
 
+// ─── Add Container Modal ──────────────────────────────────────────────────────
+
+interface AddContainerModalProps {
+  onClose: () => void
+  onCreated: (container: Container) => void
+}
+
+function AddContainerModal({ onClose, onCreated }: AddContainerModalProps) {
+  const [label, setLabel] = useState('')
+  const [barcode, setBarcode] = useState('')
+  const [notes, setNotes] = useState('')
+  const [barcodeManual, setBarcodeManual] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const labelRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => { labelRef.current?.focus() }, [])
+
+  // Auto-fill barcode from label unless user has manually edited it
+  useEffect(() => {
+    if (!barcodeManual) setBarcode(label.trim())
+  }, [label, barcodeManual])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!label.trim()) { setError('Label is required.'); return }
+    if (!barcode.trim()) { setError('Barcode is required.'); return }
+
+    setSaving(true)
+    setError(null)
+
+    if (USE_MOCKS) {
+      const now = new Date().toISOString()
+      const mockId = `c${Date.now()}`
+      const newContainer: Container = {
+        id: mockId,
+        barcode: barcode.trim(),
+        label: label.trim(),
+        notes: notes.trim() || undefined,
+        createdAt: now,
+        updatedAt: now,
+        createdById: 'u1',
+      }
+      onCreated(newContainer)
+      return
+    }
+
+    try {
+      const res = await apiCreateContainer({
+        barcode: barcode.trim(),
+        label: label.trim(),
+        notes: notes.trim() || undefined,
+      })
+      onCreated(res.data as unknown as Container)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create container.')
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <h2 className="text-sm font-semibold text-slate-800">New Container</h2>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          {/* Label */}
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">
+              Label <span className="text-red-500">*</span>
+            </label>
+            <input
+              ref={labelRef}
+              type="text"
+              value={label}
+              onChange={e => setLabel(e.target.value)}
+              placeholder="e.g. BOX-0007"
+              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
+            />
+          </div>
+
+          {/* Barcode */}
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">
+              Barcode <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={barcode}
+              onChange={e => { setBarcodeManual(true); setBarcode(e.target.value) }}
+              placeholder="Auto-filled from label"
+              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
+            />
+            {!barcodeManual && (
+              <p className="text-xs text-slate-400 mt-1">Auto-filled from label. Edit to override.</p>
+            )}
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Notes</label>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="Optional notes about this container"
+              rows={2}
+              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+            />
+          </div>
+
+          {error && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>
+          )}
+
+          {/* Actions */}
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-sm px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex items-center gap-2 text-sm px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors disabled:opacity-60"
+            >
+              {saving && <Loader2 size={13} className="animate-spin" />}
+              Create Container
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 // ─── Container Manager ────────────────────────────────────────────────────────
 
 export function ContainerManagerPage() {
   const [containers, setContainers] = useState<Container[]>(USE_MOCKS ? MOCK_CONTAINERS : [])
   const [allItems, setAllItems] = useState<AnyItem[]>(USE_MOCKS ? MOCK_ITEMS : [])
   const [loading, setLoading] = useState(!USE_MOCKS)
+  const [showAddModal, setShowAddModal] = useState(false)
 
   useEffect(() => {
     if (USE_MOCKS) return
     const load = async () => {
       setLoading(true)
       try {
-        const [ctRes, itemsRes] = await Promise.all([
+        const [ctRes, itemsRes] = await Promise.allSettled([
           apiGetContainers(),
           apiGetItems({ pageSize: 500 }),
         ])
-        setContainers(ctRes.data as any)
-        setAllItems(itemsRes.data)
+        if (ctRes.status === 'fulfilled') setContainers(ctRes.value.data as any)
+        if (itemsRes.status === 'fulfilled') setAllItems(itemsRes.value.data)
       } catch { /* fallback empty */ }
       finally { setLoading(false) }
     }
     load()
   }, [])
+
+  const handleContainerCreated = (container: Container) => {
+    setContainers(prev => [container, ...prev])
+    setShowAddModal(false)
+  }
 
   if (loading) {
     return (
@@ -301,9 +470,19 @@ export function ContainerManagerPage() {
 
   return (
     <div className="space-y-5">
+      {showAddModal && (
+        <AddContainerModal
+          onClose={() => setShowAddModal(false)}
+          onCreated={handleContainerCreated}
+        />
+      )}
+
       <div className="flex items-center justify-between">
         <p className="text-sm text-slate-500">{containers.length} containers</p>
-        <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+        >
           <Plus size={15} />
           New Container
         </button>
@@ -395,12 +574,12 @@ export function ExternalLocationsPage() {
     const load = async () => {
       setLoading(true)
       try {
-        const [extRes, itemsRes] = await Promise.all([
+        const [extRes, itemsRes] = await Promise.allSettled([
           apiGetExtLocs(),
           apiGetItems({ status: ItemStatus.TEMP_EXIT, pageSize: 200 }),
         ])
-        setExtLocs(extRes.data)
-        setExternalItems(itemsRes.data)
+        if (extRes.status === 'fulfilled') setExtLocs(extRes.value.data)
+        if (itemsRes.status === 'fulfilled') setExternalItems(itemsRes.value.data)
       } catch { /* fallback empty */ }
       finally { setLoading(false) }
     }

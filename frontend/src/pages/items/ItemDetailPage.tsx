@@ -13,6 +13,7 @@ import {
   FlaskConical,
   ExternalLink,
   Loader2,
+  Pencil,
 } from 'lucide-react'
 import { Card, CardHeader } from '../../components/ui/Card'
 import { ItemStatusBadge, ItemTypeBadge, OperationBadge } from '../../components/ui/StatusBadge'
@@ -157,6 +158,7 @@ export function ItemDetailPage() {
   }
 
   const isScrapped = item.status === ItemStatus.SCRAPPED
+  const isTempExit = item.status === ItemStatus.TEMP_EXIT
   const loc = getLocation(item)
   const containerLabel = getContainerLabel(item)
   const createdByName = getCreatedByName(item)
@@ -186,6 +188,13 @@ export function ItemDetailPage() {
           {!isScrapped && (
             <div className="flex items-center gap-2 flex-wrap">
               <Link
+                to={`/items/${item.id}/edit`}
+                className="flex items-center gap-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm px-3 py-1.5 rounded-lg transition-colors"
+              >
+                <Pencil size={14} />
+                Edit
+              </Link>
+              <Link
                 to={`/labels?item=${item.id}`}
                 className="flex items-center gap-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm px-3 py-1.5 rounded-lg transition-colors"
                 title="Print label for this item"
@@ -195,18 +204,22 @@ export function ItemDetailPage() {
               </Link>
               <Link
                 to="/operations/move"
+                state={{ itemId: item.id }}
                 className="flex items-center gap-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm px-3 py-1.5 rounded-lg transition-colors"
               >
                 <ArrowRightLeft size={14} />
                 Move
               </Link>
-              <Link
-                to="/operations/exit"
-                className="flex items-center gap-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm px-3 py-1.5 rounded-lg transition-colors"
-              >
-                <ExternalLink size={14} />
-                Temp Exit
-              </Link>
+              {!isTempExit && (
+                <Link
+                  to="/operations/exit"
+                  state={{ itemId: item.id }}
+                  className="flex items-center gap-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  <ExternalLink size={14} />
+                  Temp Exit
+                </Link>
+              )}
               {item.itemType === ItemType.CONSUMABLE && (
                 <Link
                   to="/operations/consume"
@@ -284,7 +297,7 @@ export function ItemDetailPage() {
                   <div>
                     <p className="text-xs text-slate-500 font-medium">Fixture Types</p>
                     <div className="flex flex-wrap gap-1 mt-1">
-                      {fx.fixtureTypes.map((ft) => (
+                      {fx.fixtureCategories.map((ft) => (
                         <Badge key={ft} variant="purple">{FIXTURE_TYPE_LABELS[ft]}</Badge>
                       ))}
                     </div>
@@ -341,8 +354,8 @@ export function ItemDetailPage() {
               const misc = item as MiscItem
               return (
                 <>
-                  <Field label="Name" value={misc.name} />
-                  <Field label="Description" value={misc.description} />
+                  <Field label="Name" value={misc.miscName} />
+                  <Field label="Description" value={misc.miscDescription} />
                 </>
               )
             })()}
@@ -371,11 +384,6 @@ export function ItemDetailPage() {
           <CardHeader
             title="Operation History"
             subtitle={`${itemOps.length} operation${itemOps.length !== 1 ? 's' : ''}`}
-            actions={
-              <Link to={`/items/${item.id}/history`} className="text-blue-600 hover:text-blue-700 text-xs">
-                Full history
-              </Link>
-            }
           />
           <div className="p-5">
             {itemOps.length === 0 ? (

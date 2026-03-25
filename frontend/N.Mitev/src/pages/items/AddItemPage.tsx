@@ -296,11 +296,23 @@ export function AddItemPage() {
     USE_MOCKS ? MOCK_CONTAINER_OPTIONS : [],
   )
 
+  const refreshLocations = async () => {
+    try {
+      const res = await getLocationsFlat()
+      setLocationOptions(res.data)
+    } catch {/* silent — dropdowns will be empty */}
+  }
+
   useEffect(() => {
     if (USE_MOCKS) return
-    getLocationsFlat()
-      .then(res => setLocationOptions(res.data))
-      .catch(() => {/* silent — dropdowns will be empty */})
+    refreshLocations()
+    // Auto-refresh every 5 seconds to pick up new locations from admin
+    const interval = setInterval(refreshLocations, 5000)
+    return () => clearInterval(interval)
+  }, [])
+
+  useEffect(() => {
+    if (USE_MOCKS) return
     getContainers()
       .then(res => setContainerOptions(res.data.map(c => ({ id: c.id, label: c.label }))))
       .catch(() => {/* silent */})

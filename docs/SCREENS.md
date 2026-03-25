@@ -183,8 +183,10 @@ App
 
 ### LOC-01 — Location Browser 🔲
 **Route:** `/storage/locations`
-**Access:** Admin, User, Viewer
+**Access:** Admin, User, Viewer (browse); Admin only (management CTA visible)
 **Description:** Tree browser: Site → Building → Area → Shelf → Level. Click location to see items there.
+**Admin-only CTA:** Blue info box at top with link to Location Configuration screen (`/admin/locations`) for managing hierarchy. Visible only to admin users.
+**Notes:** Non-admin users see browse-only view (no add/edit actions). Admin users see CTA to transition to management interface.
 
 ---
 

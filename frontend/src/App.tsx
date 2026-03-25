@@ -1,6 +1,7 @@
-import { Component, type ReactNode } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { Component, type ReactNode, useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { UserRole } from './types'
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null }
@@ -27,7 +28,7 @@ import { LoginPage } from './pages/auth/LoginPage'
 import { DashboardPage } from './pages/dashboard/DashboardPage'
 import { ItemListPage } from './pages/items/ItemListPage'
 import { ItemDetailPage } from './pages/items/ItemDetailPage'
-import { AddItemPage } from './pages/items/AddItemPage'
+import { AddItemPage, EditItemPage } from './pages/items/AddItemPage'
 import {
   ReceiptPage,
   MovePage,
@@ -56,12 +57,16 @@ import {
 } from './pages/admin/AdminPages'
 
 function NotFoundPage() {
+  const navigate = useNavigate()
+  useEffect(() => {
+    const timer = setTimeout(() => navigate('/', { replace: true }), 3000)
+    return () => clearTimeout(timer)
+  }, [navigate])
   return (
     <div className="flex flex-col items-center justify-center h-full py-24 text-center">
       <p className="text-6xl font-bold text-slate-200 mb-4">404</p>
       <p className="text-lg font-semibold text-slate-700 mb-1">Page not found</p>
-      <p className="text-sm text-slate-500 mb-6">The page you're looking for doesn't exist.</p>
-      <Navigate to="/" replace />
+      <p className="text-sm text-slate-500 mb-6">The page you're looking for doesn't exist. Redirecting home…</p>
     </div>
   )
 }
@@ -73,13 +78,27 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
+function PublicRoute({ children }: { children: ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuth()
+  if (isLoading) return null
+  if (isAuthenticated) return <Navigate to="/" replace />
+  return <>{children}</>
+}
+
+function AdminRoute({ children }: { children: ReactNode }) {
+  const { user, isLoading } = useAuth()
+  if (isLoading) return null
+  if (!user || user.role !== UserRole.ADMIN) return <Navigate to="/" replace />
+  return <>{children}</>
+}
+
 export default function App() {
   return (
     <AuthProvider>
     <BrowserRouter>
       <Routes>
         {/* Public */}
-        <Route path="/login" element={<LoginPage />} />
+        <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
 
         {/* App shell wraps all authenticated routes */}
         <Route element={<ProtectedRoute><ErrorBoundary><AppShell /></ErrorBoundary></ProtectedRoute>}>
@@ -88,6 +107,7 @@ export default function App() {
           {/* Items */}
           <Route path="/items" element={<ItemListPage />} />
           <Route path="/items/new/:type" element={<AddItemPage />} />
+          <Route path="/items/:id/edit" element={<EditItemPage />} />
           <Route path="/items/:id" element={<ItemDetailPage />} />
 
           {/* Operations */}
@@ -113,10 +133,10 @@ export default function App() {
           <Route path="/reports/audit" element={<AuditLogPage />} />
 
           {/* Admin */}
-          <Route path="/admin/users" element={<UserManagementPage />} />
-          <Route path="/admin/locations" element={<LocationConfigPage />} />
-          <Route path="/admin/external-locations" element={<ExternalLocationAdminPage />} />
-          <Route path="/admin/settings" element={<SystemSettingsPage />} />
+          <Route path="/admin/users" element={<AdminRoute><UserManagementPage /></AdminRoute>} />
+          <Route path="/admin/locations" element={<AdminRoute><LocationConfigPage /></AdminRoute>} />
+          <Route path="/admin/external-locations" element={<AdminRoute><ExternalLocationAdminPage /></AdminRoute>} />
+          <Route path="/admin/settings" element={<AdminRoute><SystemSettingsPage /></AdminRoute>} />
 
           {/* Fallback — 404 */}
           <Route path="*" element={<NotFoundPage />} />

@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Save, Info, Loader2 } from 'lucide-react'
 import { Card, CardHeader } from '../../components/ui/Card'
-import { FixtureType, FIXTURE_TYPE_LABELS, DEV_PHASE_LABELS } from '../../types'
-import { createItem, getLocationsFlat, getContainers } from '../../api'
-import { MOCK_ITEMS } from '../../mock/data'
+import { FixtureType, FIXTURE_TYPE_LABELS, DEV_PHASE_LABELS, ItemType } from '../../types'
+import type { AnyItem, ElectronicsSample, Fixture, SparePart, Consumable, MiscItem } from '../../types'
+import { createItem, getLocationsFlat, getContainers, getItem, updateItem } from '../../api'
+import { MOCK_ITEMS, MOCK_SITES } from '../../mock/data'
 import clsx from 'clsx'
 
 const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true'
@@ -144,12 +145,6 @@ function FixtureForm({ fields, setField, selectedTypes, setSelectedTypes }: {
       </div>
 
       <div className="col-span-full">
-        <FormField label="Picture" hint="Optional photo for visual identification">
-          <input type="file" accept="image/*" className="w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer" />
-        </FormField>
-      </div>
-
-      <div className="col-span-full">
         <FormField label="Comment">
           <textarea name="comment" rows={2} value={fields.comment ?? ''} onChange={e => setField('comment', e.target.value)} placeholder="Optional notes…" className={clsx(inputClass, 'resize-none')} />
         </FormField>
@@ -261,20 +256,224 @@ function MiscForm({ fields, setField }: {
 
 // ── Mock location/container options ─────────────────────────────────────────
 
-const MOCK_LOCATION_OPTIONS = [
-  { id: 'l1', label: 'A-01-01-1', buildingName: 'Main Building', siteName: 'Sofia' },
-  { id: 'l2', label: 'A-01-01-2', buildingName: 'Main Building', siteName: 'Sofia' },
-  { id: 'l3', label: 'A-01-02-1', buildingName: 'Main Building', siteName: 'Sofia' },
-  { id: 'l5', label: 'A-02-01-1', buildingName: 'Main Building', siteName: 'Sofia' },
-  { id: 'l6', label: 'B-01-01-1', buildingName: 'Main Building', siteName: 'Sofia' },
-  { id: 'l9', label: 'C-01-01-1', buildingName: 'Lab Building', siteName: 'Sofia' },
-]
+// Generate location options dynamically from MOCK_SITES
+function generateLocationOptions() {
+  const options: Array<{ id: string; label: string; buildingName: string; siteName: string }> = []
+  
+  MOCK_SITES.forEach(site => {
+    site.buildings.forEach(building => {
+      building.storageAreas.forEach(area => {
+        area.locations.forEach(location => {
+          options.push({
+            id: location.id,
+            label: location.label,
+            buildingName: building.name,
+            siteName: site.name,
+          })
+        })
+      })
+    })
+  })
+  
+  return options
+}
+
+const MOCK_LOCATION_OPTIONS = generateLocationOptions()
 
 const MOCK_CONTAINER_OPTIONS = MOCK_ITEMS
   .filter(i => 'containerLabel' in i && i.containerLabel)
   .map(i => ({ id: i.id, label: (i as { containerLabel: string }).containerLabel }))
 
 // ── Page ─────────────────────────────────────────────────────────────────────
+
+const FORM_TYPE_FROM_ITEM: Record<string, ItemFormType> = {
+  ELECTRONICS_SAMPLE: 'electronics',
+  FIXTURE: 'fixture',
+  SPARE_PART: 'sparepart',
+  CONSUMABLE: 'consumable',
+  MISC: 'misc',
+}
+
+export function EditItemPage() {
+  const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
+  const [item, setItem] = useState<AnyItem | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [fields, setFields] = useState<Record<string, string>>({})
+  const [fixtureTypes, setFixtureTypes] = useState<FixtureType[]>([])
+
+  function populateFields(loaded: AnyItem) {
+    const base = { labIdNumber: loaded.labIdNumber, comment: loaded.comment ?? '' }
+    switch (loaded.itemType) {
+      case ItemType.ELECTRONICS_SAMPLE: {
+        const el = loaded as ElectronicsSample
+        setFields({ ...base, oem: el.oem, productType: el.productType ?? '', productName: el.productName, oemPartNumber: el.oemPartNumber, testRequestNumber: el.testRequestNumber, serialNumber: el.serialNumber ?? '', developmentPhase: el.developmentPhase ?? '', plantLocation: el.plantLocation ?? '', requester: el.requester ?? '' })
+        break
+      }
+      case ItemType.FIXTURE: {
+        const fx = loaded as Fixture
+        setFields({ ...base, productName: fx.productName })
+        setFixtureTypes(fx.fixtureCategories)
+        break
+      }
+      case ItemType.SPARE_PART: {
+        const sp = loaded as SparePart
+        setFields({ ...base, manufacturer: sp.manufacturer, model: sp.model, partType: sp.partType, variant: sp.variant ?? '', forMachines: sp.forMachines?.join(', ') ?? '' })
+        break
+      }
+      case ItemType.CONSUMABLE: {
+        const con = loaded as Consumable
+        setFields({ ...base, manufacturer: con.manufacturer, model: con.model, consumableType: con.consumableType, quantity: String(con.quantity), unit: con.unit, lotNumber: con.lotNumber ?? '', expiryDate: con.expiryDate ? con.expiryDate.substring(0, 10) : '', shelfLife: con.shelfLifeMonths ? String(con.shelfLifeMonths) : '' })
+        break
+      }
+      case ItemType.MISC: {
+        const misc = loaded as MiscItem
+        setFields({ ...base, miscName: misc.miscName, miscDescription: misc.miscDescription ?? '' })
+        break
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (!id) return
+    if (USE_MOCKS) {
+      const found = MOCK_ITEMS.find(i => i.id === id) ?? null
+      if (found) populateFields(found)
+      setItem(found)
+      setLoading(false)
+      return
+    }
+    getItem(id)
+      .then(res => { setItem(res.data); populateFields(res.data) })
+      .catch(err => setError(err instanceof Error ? err.message : 'Failed to load item'))
+      .finally(() => setLoading(false))
+  }, [id])
+
+  function setField(name: string, value: string) {
+    setFields(prev => ({ ...prev, [name]: value }))
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!item || !id) return
+    setError('')
+    setSaving(true)
+
+    if (USE_MOCKS) {
+      setTimeout(() => { setSaving(false); navigate(`/items/${id}`) }, 800)
+      return
+    }
+
+    try {
+      let payload: Record<string, unknown> = {
+        comment: fields.comment || undefined,
+      }
+      switch (item.itemType) {
+        case ItemType.ELECTRONICS_SAMPLE:
+          payload = { ...payload, oem: fields.oem, productType: fields.productType, productName: fields.productName, oemPartNumber: fields.oemPartNumber, testRequestNumber: fields.testRequestNumber, serialNumber: fields.serialNumber || undefined, developmentPhase: fields.developmentPhase || undefined, plantLocation: fields.plantLocation || undefined, requester: fields.requester || undefined }
+          break
+        case ItemType.FIXTURE:
+          payload = { ...payload, productName: fields.productName, fixtureCategories: fixtureTypes }
+          break
+        case ItemType.SPARE_PART:
+          payload = { ...payload, manufacturer: fields.manufacturer, model: fields.model, partType: fields.partType, variant: fields.variant || undefined, forMachines: fields.forMachines ? fields.forMachines.split(',').map(s => s.trim()).filter(Boolean) : undefined }
+          break
+        case ItemType.CONSUMABLE:
+          payload = { ...payload, manufacturer: fields.manufacturer, model: fields.model, consumableType: fields.consumableType, quantity: parseFloat(fields.quantity), unit: fields.unit, lotNumber: fields.lotNumber || undefined, expiryDate: fields.expiryDate ? new Date(fields.expiryDate).toISOString() : undefined, shelfLifeMonths: fields.shelfLife ? parseInt(fields.shelfLife, 10) : undefined }
+          break
+        case ItemType.MISC:
+          payload = { ...payload, miscName: fields.miscName, miscDescription: fields.miscDescription || undefined }
+          break
+      }
+      await updateItem(id, payload)
+      navigate(`/items/${id}`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save changes')
+      setSaving(false)
+    }
+  }
+
+  const formType: ItemFormType = item ? (FORM_TYPE_FROM_ITEM[item.itemType] ?? 'electronics') : 'electronics'
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20 gap-2 text-slate-400">
+        <Loader2 size={20} className="animate-spin" />
+        <span className="text-sm">Loading item…</span>
+      </div>
+    )
+  }
+
+  if (!item) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-slate-500">
+        <p className="text-lg font-medium text-red-600">{error || 'Item not found'}</p>
+        <Link to="/items" className="mt-3 text-blue-600 hover:text-blue-700 text-sm flex items-center gap-1">
+          <ArrowLeft size={14} /> Back to Items
+        </Link>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-5 max-w-3xl">
+      <Link to={`/items/${id}`} className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 transition-colors">
+        <ArrowLeft size={15} />
+        Back to Item
+      </Link>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-3 text-sm text-red-700">{error}</div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <Card>
+          <CardHeader
+            title={`Edit ${FORM_TITLES[formType].replace('Add ', '')}`}
+            subtitle={item.labIdNumber}
+          />
+          <div className="p-5 space-y-5">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Lab ID Number</label>
+              <input
+                type="text"
+                value={item.labIdNumber}
+                readOnly
+                className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-500 bg-slate-50 cursor-not-allowed font-mono"
+              />
+              <p className="text-xs text-slate-400 mt-1 flex items-center gap-1"><Info size={11} />Lab ID cannot be changed after creation</p>
+            </div>
+            {formType === 'electronics' && <ElectronicsForm fields={fields} setField={setField} />}
+            {formType === 'fixture' && <FixtureForm fields={fields} setField={setField} selectedTypes={fixtureTypes} setSelectedTypes={setFixtureTypes} />}
+            {formType === 'sparepart' && <SparePartForm fields={fields} setField={setField} />}
+            {formType === 'consumable' && <ConsumableForm fields={fields} setField={setField} />}
+            {formType === 'misc' && <MiscForm fields={fields} setField={setField} />}
+          </div>
+        </Card>
+
+        <div className="flex items-center gap-3 justify-end">
+          <Link
+            to={`/items/${id}`}
+            className="px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+          >
+            Cancel
+          </Link>
+          <button
+            type="submit"
+            disabled={saving}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors"
+          >
+            {saving ? <><Loader2 size={14} className="animate-spin" />Saving…</> : <><Save size={15} />Save Changes</>}
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+// ── Add Item Page ─────────────────────────────────────────────────────────────
 
 export function AddItemPage() {
   const { type } = useParams<{ type: string }>()
@@ -296,14 +495,28 @@ export function AddItemPage() {
     USE_MOCKS ? MOCK_CONTAINER_OPTIONS : [],
   )
 
+  const refreshLocations = async () => {
+    try {
+      const res = await getLocationsFlat()
+      setLocationOptions(res.data || [])
+    } catch {
+      // Silently retry on next interval
+    }
+  }
+
   useEffect(() => {
     if (USE_MOCKS) return
-    getLocationsFlat()
-      .then(res => setLocationOptions(res.data))
-      .catch(() => {/* silent — dropdowns will be empty */})
+    refreshLocations()
+    // Refresh locations every 5 seconds to pick up changes from admin
+    const interval = setInterval(refreshLocations, 5000)
+    return () => clearInterval(interval)
+  }, [])
+
+  useEffect(() => {
+    if (USE_MOCKS) return
     getContainers()
       .then(res => setContainerOptions(res.data.map(c => ({ id: c.id, label: c.label }))))
-      .catch(() => {/* silent */})
+      .catch(() => {})
   }, [])
 
   const formType: ItemFormType = VALID_TYPES.includes(type as ItemFormType)
@@ -321,7 +534,6 @@ export function AddItemPage() {
     setSaving(true)
 
     if (USE_MOCKS) {
-      console.log('AddItem payload (mock):', { itemType: formType, ...fields, fixtureTypes, locationId, containerId })
       setTimeout(() => { setSaving(false); navigate('/items') }, 1000)
       return
     }

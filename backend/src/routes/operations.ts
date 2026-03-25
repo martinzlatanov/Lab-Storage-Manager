@@ -10,11 +10,8 @@ const ReceiptBody = z.object({
   containerId: z.string().optional(),
   notes: z.string().optional(),
 }).refine(
-  (d) => !!(d.locationId || d.containerId),
-  { message: "Receipt requires either a locationId or containerId" }
-).refine(
-  (d) => !(d.locationId && d.containerId),
-  { message: "Provide either locationId or containerId, not both" }
+  (d) => d.locationId || d.containerId,
+  { message: "At least one of locationId or containerId must be provided" }
 );
 
 const MoveBody = z.object({
@@ -23,11 +20,8 @@ const MoveBody = z.object({
   toContainerId: z.string().optional(),
   notes: z.string().optional(),
 }).refine(
-  (d) => !!(d.toLocationId || d.toContainerId),
-  { message: "Move requires either a toLocationId or toContainerId" }
-).refine(
-  (d) => !(d.toLocationId && d.toContainerId),
-  { message: "Provide either toLocationId or toContainerId, not both" }
+  (d) => d.toLocationId || d.toContainerId,
+  { message: "At least one of toLocationId or toContainerId must be provided" }
 );
 
 const ExitBody = z.object({
@@ -42,13 +36,7 @@ const ReturnBody = z.object({
   toLocationId: z.string().optional(),
   toContainerId: z.string().optional(),
   notes: z.string().optional(),
-}).refine(
-  (d) => !!(d.toLocationId || d.toContainerId),
-  { message: "Return requires either a toLocationId or toContainerId" }
-).refine(
-  (d) => !(d.toLocationId && d.toContainerId),
-  { message: "Provide either toLocationId or toContainerId, not both" }
-);
+});
 
 const ScrapBody = z.object({
   itemId: z.string().min(1),
@@ -133,7 +121,7 @@ export default async function operationsRoutes(app: FastifyInstance) {
   // ── POST /api/v1/operations/receipt ───────────────────────────────────────
   app.post(
     "/operations/receipt",
-    { preHandler: [app.authenticate, app.requireRole("USER")] },
+    { preHandler: [app.authenticate, app.requireRole("USER", "ADMIN")] },
     async (req, reply) => {
       const body = ReceiptBody.safeParse(req.body);
       if (!body.success) {
@@ -186,7 +174,7 @@ export default async function operationsRoutes(app: FastifyInstance) {
   // ── POST /api/v1/operations/move ──────────────────────────────────────────
   app.post(
     "/operations/move",
-    { preHandler: [app.authenticate, app.requireRole("USER")] },
+    { preHandler: [app.authenticate, app.requireRole("USER", "ADMIN")] },
     async (req, reply) => {
       const body = MoveBody.safeParse(req.body);
       if (!body.success) {
@@ -242,7 +230,7 @@ export default async function operationsRoutes(app: FastifyInstance) {
   // ── POST /api/v1/operations/exit ──────────────────────────────────────────
   app.post(
     "/operations/exit",
-    { preHandler: [app.authenticate, app.requireRole("USER")] },
+    { preHandler: [app.authenticate, app.requireRole("USER", "ADMIN")] },
     async (req, reply) => {
       const body = ExitBody.safeParse(req.body);
       if (!body.success) {
@@ -294,7 +282,7 @@ export default async function operationsRoutes(app: FastifyInstance) {
   // ── POST /api/v1/operations/return ────────────────────────────────────────
   app.post(
     "/operations/return",
-    { preHandler: [app.authenticate, app.requireRole("USER")] },
+    { preHandler: [app.authenticate, app.requireRole("USER", "ADMIN")] },
     async (req, reply) => {
       const body = ReturnBody.safeParse(req.body);
       if (!body.success) {
@@ -348,7 +336,7 @@ export default async function operationsRoutes(app: FastifyInstance) {
   // ── POST /api/v1/operations/scrap ─────────────────────────────────────────
   app.post(
     "/operations/scrap",
-    { preHandler: [app.authenticate, app.requireRole("USER")] },
+    { preHandler: [app.authenticate, app.requireRole("USER", "ADMIN")] },
     async (req, reply) => {
       const body = ScrapBody.safeParse(req.body);
       if (!body.success) {
@@ -388,7 +376,7 @@ export default async function operationsRoutes(app: FastifyInstance) {
   // ── POST /api/v1/operations/consume ───────────────────────────────────────
   app.post(
     "/operations/consume",
-    { preHandler: [app.authenticate, app.requireRole("USER")] },
+    { preHandler: [app.authenticate, app.requireRole("USER", "ADMIN")] },
     async (req, reply) => {
       const body = ConsumeBody.safeParse(req.body);
       if (!body.success) {

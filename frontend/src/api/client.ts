@@ -86,10 +86,6 @@ export async function apiFetch<T>(
       res = await doFetch()
     } else {
       clearTokens()
-      // Redirect to login if refresh fails
-      if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
-        window.location.href = '/login'
-      }
       throw new ApiError('Session expired', 401)
     }
   }

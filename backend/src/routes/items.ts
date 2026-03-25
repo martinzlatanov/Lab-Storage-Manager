@@ -9,8 +9,8 @@ const LocationFields = z.object({
   containerId: z.string().optional(),
   externalLocationId: z.string().optional(),
 }).refine(
-  (d) => [d.locationId, d.containerId, d.externalLocationId].filter(Boolean).length <= 1,
-  { message: "An item can only be at one location at a time (locationId, containerId, or externalLocationId)" }
+  (d) => !d.externalLocationId || (!d.locationId && !d.containerId),
+  { message: "externalLocationId cannot be combined with locationId or containerId" }
 );
 
 // ─── Create schemas per item type ─────────────────────────────────────────────
@@ -76,6 +76,7 @@ const CreateMiscBody = LocationFields.and(z.object({
 
 const UpdateItemBody = z.object({
   comment: z.string().nullable().optional(),
+  labIdNumber: z.string().min(1).max(100).optional(),
   // Electronics
   oem: z.string().optional(),
   productName: z.string().optional(),
@@ -117,7 +118,7 @@ const ListItemsQuery = z.object({
   containerId: z.string().optional(),
   search: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+  pageSize: z.coerce.number().int().min(1).max(1000).default(25),
 });
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -344,7 +345,7 @@ export default async function itemsRoutes(app: FastifyInstance) {
   // ── POST /api/v1/items/electronics ────────────────────────────────────────
   app.post(
     "/items/electronics",
-    { preHandler: [app.authenticate, app.requireRole("USER")] },
+    { preHandler: [app.authenticate, app.requireRole("USER", "ADMIN")] },
     async (req, reply) => {
       const body = CreateElectronicsBody.safeParse(req.body);
       if (!body.success) {
@@ -359,26 +360,44 @@ export default async function itemsRoutes(app: FastifyInstance) {
       const locationError = await validateLocation(body.data.locationId, body.data.containerId, body.data.externalLocationId);
       if (locationError) return reply.status(404).send({ success: false, error: locationError });
 
-      const item = await prisma.item.create({
-        data: {
-          itemType: "ELECTRONICS_SAMPLE",
-          barcode: body.data.barcode,
-          labIdNumber: body.data.labIdNumber,
-          comment: body.data.comment,
-          locationId: body.data.locationId,
-          containerId: body.data.containerId,
-          externalLocationId: body.data.externalLocationId,
-          createdById: req.user.id,
-          oem: body.data.oem,
-          productName: body.data.productName,
-          productType: body.data.productType,
-          oemPartNumber: body.data.oemPartNumber,
-          serialNumber: body.data.serialNumber,
-          developmentPhase: body.data.developmentPhase,
-          plantLocation: body.data.plantLocation,
-          testRequestNumber: body.data.testRequestNumber,
-          requester: body.data.requester,
-        },
+      const { locationId, containerId, externalLocationId } = body.data;
+      const hasLocation = locationId || containerId || externalLocationId;
+
+      const [item] = await prisma.$transaction(async (tx) => {
+        const created = await tx.item.create({
+          data: {
+            itemType: "ELECTRONICS_SAMPLE",
+            barcode: body.data.barcode,
+            labIdNumber: body.data.labIdNumber,
+            comment: body.data.comment,
+            locationId,
+            containerId,
+            externalLocationId,
+            createdById: req.user.id,
+            oem: body.data.oem,
+            productName: body.data.productName,
+            productType: body.data.productType,
+            oemPartNumber: body.data.oemPartNumber,
+            serialNumber: body.data.serialNumber,
+            developmentPhase: body.data.developmentPhase,
+            plantLocation: body.data.plantLocation,
+            testRequestNumber: body.data.testRequestNumber,
+            requester: body.data.requester,
+          },
+        });
+        if (hasLocation) {
+          await tx.operationRecord.create({
+            data: {
+              operationType: "RECEIPT",
+              itemId: created.id,
+              performedById: req.user.id,
+              toLocationId: locationId,
+              toContainerId: containerId,
+              toExternalLocationId: externalLocationId,
+            },
+          });
+        }
+        return [created];
       });
 
       return reply.status(201).send({ success: true, data: item });
@@ -388,7 +407,7 @@ export default async function itemsRoutes(app: FastifyInstance) {
   // ── POST /api/v1/items/fixture ────────────────────────────────────────────
   app.post(
     "/items/fixture",
-    { preHandler: [app.authenticate, app.requireRole("USER")] },
+    { preHandler: [app.authenticate, app.requireRole("USER", "ADMIN")] },
     async (req, reply) => {
       const body = CreateFixtureBody.safeParse(req.body);
       if (!body.success) {
@@ -403,20 +422,38 @@ export default async function itemsRoutes(app: FastifyInstance) {
       const locationError = await validateLocation(body.data.locationId, body.data.containerId, body.data.externalLocationId);
       if (locationError) return reply.status(404).send({ success: false, error: locationError });
 
-      const item = await prisma.item.create({
-        data: {
-          itemType: "FIXTURE",
-          barcode: body.data.barcode,
-          labIdNumber: body.data.labIdNumber,
-          comment: body.data.comment,
-          locationId: body.data.locationId,
-          containerId: body.data.containerId,
-          externalLocationId: body.data.externalLocationId,
-          createdById: req.user.id,
-          productName: body.data.productName,
-          fixtureCategories: body.data.fixtureCategories,
-          pictureUrl: body.data.pictureUrl,
-        },
+      const { locationId, containerId, externalLocationId } = body.data;
+      const hasLocation = locationId || containerId || externalLocationId;
+
+      const [item] = await prisma.$transaction(async (tx) => {
+        const created = await tx.item.create({
+          data: {
+            itemType: "FIXTURE",
+            barcode: body.data.barcode,
+            labIdNumber: body.data.labIdNumber,
+            comment: body.data.comment,
+            locationId,
+            containerId,
+            externalLocationId,
+            createdById: req.user.id,
+            productName: body.data.productName,
+            fixtureCategories: body.data.fixtureCategories,
+            pictureUrl: body.data.pictureUrl,
+          },
+        });
+        if (hasLocation) {
+          await tx.operationRecord.create({
+            data: {
+              operationType: "RECEIPT",
+              itemId: created.id,
+              performedById: req.user.id,
+              toLocationId: locationId,
+              toContainerId: containerId,
+              toExternalLocationId: externalLocationId,
+            },
+          });
+        }
+        return [created];
       });
 
       return reply.status(201).send({ success: true, data: item });
@@ -426,7 +463,7 @@ export default async function itemsRoutes(app: FastifyInstance) {
   // ── POST /api/v1/items/sparepart ──────────────────────────────────────────
   app.post(
     "/items/sparepart",
-    { preHandler: [app.authenticate, app.requireRole("USER")] },
+    { preHandler: [app.authenticate, app.requireRole("USER", "ADMIN")] },
     async (req, reply) => {
       const body = CreateSparePartBody.safeParse(req.body);
       if (!body.success) {
@@ -441,22 +478,40 @@ export default async function itemsRoutes(app: FastifyInstance) {
       const locationError = await validateLocation(body.data.locationId, body.data.containerId, body.data.externalLocationId);
       if (locationError) return reply.status(404).send({ success: false, error: locationError });
 
-      const item = await prisma.item.create({
-        data: {
-          itemType: "SPARE_PART",
-          barcode: body.data.barcode,
-          labIdNumber: body.data.labIdNumber,
-          comment: body.data.comment,
-          locationId: body.data.locationId,
-          containerId: body.data.containerId,
-          externalLocationId: body.data.externalLocationId,
-          createdById: req.user.id,
-          manufacturer: body.data.manufacturer,
-          model: body.data.model,
-          partType: body.data.partType,
-          variant: body.data.variant,
-          forMachines: body.data.forMachines ?? [],
-        },
+      const { locationId, containerId, externalLocationId } = body.data;
+      const hasLocation = locationId || containerId || externalLocationId;
+
+      const [item] = await prisma.$transaction(async (tx) => {
+        const created = await tx.item.create({
+          data: {
+            itemType: "SPARE_PART",
+            barcode: body.data.barcode,
+            labIdNumber: body.data.labIdNumber,
+            comment: body.data.comment,
+            locationId,
+            containerId,
+            externalLocationId,
+            createdById: req.user.id,
+            manufacturer: body.data.manufacturer,
+            model: body.data.model,
+            partType: body.data.partType,
+            variant: body.data.variant,
+            forMachines: body.data.forMachines ?? [],
+          },
+        });
+        if (hasLocation) {
+          await tx.operationRecord.create({
+            data: {
+              operationType: "RECEIPT",
+              itemId: created.id,
+              performedById: req.user.id,
+              toLocationId: locationId,
+              toContainerId: containerId,
+              toExternalLocationId: externalLocationId,
+            },
+          });
+        }
+        return [created];
       });
 
       return reply.status(201).send({ success: true, data: item });
@@ -466,7 +521,7 @@ export default async function itemsRoutes(app: FastifyInstance) {
   // ── POST /api/v1/items/consumable ─────────────────────────────────────────
   app.post(
     "/items/consumable",
-    { preHandler: [app.authenticate, app.requireRole("USER")] },
+    { preHandler: [app.authenticate, app.requireRole("USER", "ADMIN")] },
     async (req, reply) => {
       const body = CreateConsumableBody.safeParse(req.body);
       if (!body.success) {
@@ -481,25 +536,43 @@ export default async function itemsRoutes(app: FastifyInstance) {
       const locationError = await validateLocation(body.data.locationId, body.data.containerId, body.data.externalLocationId);
       if (locationError) return reply.status(404).send({ success: false, error: locationError });
 
-      const item = await prisma.item.create({
-        data: {
-          itemType: "CONSUMABLE",
-          barcode: body.data.barcode,
-          labIdNumber: body.data.labIdNumber,
-          comment: body.data.comment,
-          locationId: body.data.locationId,
-          containerId: body.data.containerId,
-          externalLocationId: body.data.externalLocationId,
-          createdById: req.user.id,
-          manufacturer: body.data.manufacturer,
-          model: body.data.model,
-          consumableType: body.data.consumableType,
-          quantity: body.data.quantity,
-          unit: body.data.unit,
-          lotNumber: body.data.lotNumber,
-          expiryDate: body.data.expiryDate ? new Date(body.data.expiryDate) : undefined,
-          shelfLifeMonths: body.data.shelfLifeMonths,
-        },
+      const { locationId, containerId, externalLocationId } = body.data;
+      const hasLocation = locationId || containerId || externalLocationId;
+
+      const [item] = await prisma.$transaction(async (tx) => {
+        const created = await tx.item.create({
+          data: {
+            itemType: "CONSUMABLE",
+            barcode: body.data.barcode,
+            labIdNumber: body.data.labIdNumber,
+            comment: body.data.comment,
+            locationId,
+            containerId,
+            externalLocationId,
+            createdById: req.user.id,
+            manufacturer: body.data.manufacturer,
+            model: body.data.model,
+            consumableType: body.data.consumableType,
+            quantity: body.data.quantity,
+            unit: body.data.unit,
+            lotNumber: body.data.lotNumber,
+            expiryDate: body.data.expiryDate ? new Date(body.data.expiryDate) : undefined,
+            shelfLifeMonths: body.data.shelfLifeMonths,
+          },
+        });
+        if (hasLocation) {
+          await tx.operationRecord.create({
+            data: {
+              operationType: "RECEIPT",
+              itemId: created.id,
+              performedById: req.user.id,
+              toLocationId: locationId,
+              toContainerId: containerId,
+              toExternalLocationId: externalLocationId,
+            },
+          });
+        }
+        return [created];
       });
 
       return reply.status(201).send({ success: true, data: item });
@@ -509,7 +582,7 @@ export default async function itemsRoutes(app: FastifyInstance) {
   // ── POST /api/v1/items/misc ───────────────────────────────────────────────
   app.post(
     "/items/misc",
-    { preHandler: [app.authenticate, app.requireRole("USER")] },
+    { preHandler: [app.authenticate, app.requireRole("USER", "ADMIN")] },
     async (req, reply) => {
       const body = CreateMiscBody.safeParse(req.body);
       if (!body.success) {
@@ -524,19 +597,37 @@ export default async function itemsRoutes(app: FastifyInstance) {
       const locationError = await validateLocation(body.data.locationId, body.data.containerId, body.data.externalLocationId);
       if (locationError) return reply.status(404).send({ success: false, error: locationError });
 
-      const item = await prisma.item.create({
-        data: {
-          itemType: "MISC",
-          barcode: body.data.barcode,
-          labIdNumber: body.data.labIdNumber,
-          comment: body.data.comment,
-          locationId: body.data.locationId,
-          containerId: body.data.containerId,
-          externalLocationId: body.data.externalLocationId,
-          createdById: req.user.id,
-          miscName: body.data.miscName,
-          miscDescription: body.data.miscDescription,
-        },
+      const { locationId, containerId, externalLocationId } = body.data;
+      const hasLocation = locationId || containerId || externalLocationId;
+
+      const [item] = await prisma.$transaction(async (tx) => {
+        const created = await tx.item.create({
+          data: {
+            itemType: "MISC",
+            barcode: body.data.barcode,
+            labIdNumber: body.data.labIdNumber,
+            comment: body.data.comment,
+            locationId,
+            containerId,
+            externalLocationId,
+            createdById: req.user.id,
+            miscName: body.data.miscName,
+            miscDescription: body.data.miscDescription,
+          },
+        });
+        if (hasLocation) {
+          await tx.operationRecord.create({
+            data: {
+              operationType: "RECEIPT",
+              itemId: created.id,
+              performedById: req.user.id,
+              toLocationId: locationId,
+              toContainerId: containerId,
+              toExternalLocationId: externalLocationId,
+            },
+          });
+        }
+        return [created];
       });
 
       return reply.status(201).send({ success: true, data: item });
@@ -546,7 +637,7 @@ export default async function itemsRoutes(app: FastifyInstance) {
   // ── PATCH /api/v1/items/:id ───────────────────────────────────────────────
   app.patch(
     "/items/:id",
-    { preHandler: [app.authenticate, app.requireRole("USER")] },
+    { preHandler: [app.authenticate, app.requireRole("USER", "ADMIN")] },
     async (req, reply) => {
       const { id } = req.params as { id: string };
       const body = UpdateItemBody.safeParse(req.body);

@@ -4,11 +4,11 @@
  */
 
 import { useState, useEffect } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { ArrowLeft, CheckCircle2, ScanLine, Search, Loader2, AlertTriangle } from 'lucide-react'
 import { Card, CardHeader } from '../../components/ui/Card'
 import { ItemStatusBadge, ItemTypeBadge } from '../../components/ui/StatusBadge'
-import { MOCK_ITEMS, MOCK_EXTERNAL_LOCATIONS } from '../../mock/data'
+import { MOCK_ITEMS, MOCK_CONTAINERS, MOCK_EXTERNAL_LOCATIONS, MOCK_SITES } from '../../mock/data'
 import { ItemType, ItemStatus } from '../../types'
 import type { AnyItem } from '../../types'
 import {
@@ -26,25 +26,35 @@ const inputClass =
 
 type LocationOption = { id: string; label: string; buildingName: string; siteName: string }
 type ContainerOption = { id: string; label: string }
-type ExternalLocationOption = { id: string; name: string; city: string; country: string }
+type ExternalLocationOption = { id: string; name: string; city: string; country?: string }
 
 // ── Mock data fallbacks ───────────────────────────────────────────────────────
 
-const MOCK_LOCATION_OPTIONS: LocationOption[] = [
-  { id: 'l1', label: 'A-01-01-1', buildingName: 'Main Building', siteName: 'Sofia' },
-  { id: 'l2', label: 'A-01-01-2', buildingName: 'Main Building', siteName: 'Sofia' },
-  { id: 'l3', label: 'A-01-02-1', buildingName: 'Main Building', siteName: 'Sofia' },
-  { id: 'l6', label: 'B-01-01-1', buildingName: 'Main Building', siteName: 'Sofia' },
-  { id: 'l9', label: 'C-01-01-1', buildingName: 'Lab Building', siteName: 'Sofia' },
-  { id: 'l11', label: 'A-01-01-1', buildingName: 'Tech Center', siteName: 'Munich' },
-]
+// Generate location options dynamically from MOCK_SITES
+function generateLocationOptions(): LocationOption[] {
+  const options: LocationOption[] = []
+  
+  MOCK_SITES.forEach(site => {
+    site.buildings.forEach(building => {
+      building.storageAreas.forEach(area => {
+        area.locations.forEach(location => {
+          options.push({
+            id: location.id,
+            label: location.label,
+            buildingName: building.name,
+            siteName: site.name,
+          })
+        })
+      })
+    })
+  })
+  
+  return options
+}
 
-const MOCK_CONTAINER_OPTIONS: ContainerOption[] = [
-  { id: 'c1', label: 'BOX-0001' },
-  { id: 'c2', label: 'BOX-0002' },
-  { id: 'c3', label: 'BOX-0003' },
-  { id: 'c4', label: 'BOX-0004' },
-]
+const MOCK_LOCATION_OPTIONS = generateLocationOptions()
+
+const MOCK_CONTAINER_OPTIONS: ContainerOption[] = MOCK_CONTAINERS.map(c => ({ id: c.id, label: c.label }))
 
 const MOCK_EXTERNAL_OPTS: ExternalLocationOption[] = MOCK_EXTERNAL_LOCATIONS.map(el => ({
   id: el.id,
@@ -57,20 +67,32 @@ const MOCK_EXTERNAL_OPTS: ExternalLocationOption[] = MOCK_EXTERNAL_LOCATIONS.map
 
 function useLocations() {
   const [options, setOptions] = useState<LocationOption[]>(USE_MOCKS ? MOCK_LOCATION_OPTIONS : [])
+  const [error, setError] = useState('')
   useEffect(() => {
     if (USE_MOCKS) return
-    getLocationsFlat().then(r => setOptions(r.data)).catch(() => {})
+    const refreshLocations = () => {
+      getLocationsFlat()
+        .then(r => { setOptions(r.data); setError('') })
+        .catch(() => setError('Failed to load locations'))
+    }
+    refreshLocations()
+    // Auto-refresh every 5 seconds to pick up new locations from admin
+    const interval = setInterval(refreshLocations, 5000)
+    return () => clearInterval(interval)
   }, [])
-  return options
+  return { options, error }
 }
 
 function useContainers() {
   const [options, setOptions] = useState<ContainerOption[]>(USE_MOCKS ? MOCK_CONTAINER_OPTIONS : [])
+  const [error, setError] = useState('')
   useEffect(() => {
     if (USE_MOCKS) return
-    getContainers().then(r => setOptions(r.data.map(c => ({ id: c.id, label: c.label })))).catch(() => {})
+    getContainers()
+      .then(r => { setOptions(r.data.map(c => ({ id: c.id, label: c.label }))); setError('') })
+      .catch(() => setError('Failed to load containers'))
   }, [])
-  return options
+  return { options, error }
 }
 
 function useExternalLocations() {
@@ -209,8 +231,8 @@ export function ReceiptPage() {
   const [containerId, setContainerId] = useState('')
   const [notes, setNotes] = useState('')
   const navigate = useNavigate()
-  const locationOptions = useLocations()
-  const containerOptions = useContainers()
+  const { options: locationOptions, error: locationError } = useLocations()
+  const { options: containerOptions } = useContainers()
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -280,6 +302,7 @@ export function ReceiptPage() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">Location <span className="text-red-500">*</span></label>
+                  {locationError && <p className="text-xs text-red-600 mb-1 flex items-center gap-1"><AlertTriangle size={11} />{locationError}</p>}
                   <select value={locationId} onChange={e => setLocationId(e.target.value)} className={inputClass}>
                     <option value="">— Select location —</option>
                     {locationOptions.map(loc => (
@@ -343,7 +366,10 @@ export function ReceiptPage() {
 // ─── Move ─────────────────────────────────────────────────────────────────────
 
 export function MovePage() {
-  const [selectedItemId, setSelectedItemId] = useState('')
+  const location = useLocation()
+  const prefilledItemId = (location.state as { itemId?: string } | null)?.itemId ?? ''
+
+  const [selectedItemId, setSelectedItemId] = useState(prefilledItemId)
   const [selectedItem, setSelectedItem] = useState<AnyItem | null>(null)
   const [destLocationId, setDestLocationId] = useState('')
   const [destContainerId, setDestContainerId] = useState('')
@@ -351,8 +377,12 @@ export function MovePage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const navigate = useNavigate()
-  const locationOptions = useLocations()
-  const containerOptions = useContainers()
+  const { options: locationOptions, error: locationError } = useLocations()
+  const { options: containerOptions } = useContainers()
+
+  useEffect(() => {
+    if (prefilledItemId) handleSelectItem(prefilledItemId)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleSelectItem(id: string) {
     setSelectedItemId(id)
@@ -407,21 +437,34 @@ export function MovePage() {
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Item <span className="text-red-500">*</span></label>
-            <ItemSearchBox onSelect={handleSelectItem} />
+            {selectedItem && asAny ? (
+              <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-mono text-sm font-medium text-slate-800">{selectedItem.labIdNumber}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <ItemTypeBadge type={selectedItem.itemType} />
+                      <ItemStatusBadge status={selectedItem.status} />
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1.5">Current location: {getItemLocation(asAny)}</p>
+                    {getItemContainer(asAny) && (
+                      <p className="text-xs text-slate-500">Container: {getItemContainer(asAny)}</p>
+                    )}
+                  </div>
+                  <button type="button" onClick={() => { setSelectedItemId(''); setSelectedItem(null) }}
+                    className="text-xs text-blue-600 hover:text-blue-800 shrink-0">
+                    Change
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <ItemSearchBox onSelect={handleSelectItem} />
+            )}
           </div>
-
-          {selectedItem && asAny && (
-            <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-              <p className="text-xs text-slate-500 mb-1">Current location</p>
-              <p className="font-mono text-sm text-slate-800">{getItemLocation(asAny)}</p>
-              {getItemContainer(asAny) && (
-                <p className="text-xs text-slate-500 mt-0.5">Container: {getItemContainer(asAny)}</p>
-              )}
-            </div>
-          )}
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Destination Location <span className="text-red-500">*</span></label>
+            {locationError && <p className="text-xs text-red-600 mb-1 flex items-center gap-1"><AlertTriangle size={11} />{locationError}</p>}
             <select value={destLocationId} onChange={e => setDestLocationId(e.target.value)} className={inputClass}>
               <option value="">— Select destination —</option>
               {locationOptions.map(loc => (
@@ -519,7 +562,7 @@ export function ExitPage() {
             <select value={externalLocationId} onChange={e => setExternalLocationId(e.target.value)} className={inputClass}>
               <option value="">— Select external location —</option>
               {externalOptions.map(el => (
-                <option key={el.id} value={el.id}>{el.name} ({el.city}, {el.country})</option>
+                <option key={el.id} value={el.id}>{el.name} ({el.city}{el.country ? `, ${el.country}` : ''})</option>
               ))}
             </select>
           </div>
@@ -555,8 +598,8 @@ export function ReturnPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const navigate = useNavigate()
-  const locationOptions = useLocations()
-  const containerOptions = useContainers()
+  const { options: locationOptions, error: locationError } = useLocations()
+  const { options: containerOptions } = useContainers()
 
   function handleSelectItem(id: string) {
     setSelectedItemId(id)
@@ -631,6 +674,7 @@ export function ReturnPage() {
             <>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Assign to Location <span className="text-red-500">*</span></label>
+                {locationError && <p className="text-xs text-red-600 mb-1 flex items-center gap-1"><AlertTriangle size={11} />{locationError}</p>}
                 <select value={returnLocationId} onChange={e => setReturnLocationId(e.target.value)} className={inputClass}>
                   <option value="">— Select storage location —</option>
                   {locationOptions.map(loc => (

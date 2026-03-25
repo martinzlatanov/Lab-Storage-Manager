@@ -5,7 +5,7 @@ import { createContext, useContext, type ReactNode } from 'react'
 import type { AuthUser } from '../api/auth'
 
 // DEV MODE — auth bypassed, no LDAP required
-const DEV_USER: AuthUser = { id: 'dev', username: 'dev', displayName: 'Dev User', role: 'admin' }
+const DEV_USER: AuthUser = { id: 'dev', username: 'dev', displayName: 'Dev User', role: 'ADMIN' }
 
 interface AuthContextValue {
   user: AuthUser | null

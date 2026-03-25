@@ -70,10 +70,41 @@ export interface ExternalLocationsResponse {
   data: ExternalLocation[]
 }
 
+// Full hierarchy response — used by LocationBrowserPage
+export interface SitesTreeResponse {
+  success: true
+  data: Array<{
+    id: string
+    name: string
+    buildings: Array<{
+      id: string
+      name: string
+      siteId: string
+      storageAreas: Array<{
+        id: string
+        code: string
+        buildingId: string
+        locations: Array<{
+          id: string
+          label: string
+          row: string
+          shelf: string
+          level: string
+          storageAreaId: string
+        }>
+      }>
+    }>
+  }>
+}
+
 // ── API functions ───────────────────────────────────────────────────────────
 
 export function getSites(): Promise<SitesResponse> {
   return apiGet<SitesResponse>('/sites')
+}
+
+export function getSitesTree(): Promise<SitesTreeResponse> {
+  return apiGet<SitesTreeResponse>('/sites/tree')
 }
 
 export function getBuildings(siteId: string): Promise<BuildingsResponse> {

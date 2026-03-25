@@ -4,7 +4,7 @@
 
 **What it is:** Warehouse management system for electronics testing labs and R&D centers (Visteon).
 **Purpose:** Every item must be locatable at all times. Every movement tracked until EOL.
-**Status:** Frontend UI implemented with mock data. Backend not yet scaffolded.
+**Status:** Backend fully implemented and integrated. Frontend integration in progress. 5 backend bugs fixed (security, audit trail, validation).
 **Team:** Martin (developer), Venelin (lab manager / domain expert)
 **Deployment:** On-premises, Linux server, accessed via browser + Android 2D scanners.
 
@@ -21,6 +21,8 @@
 | [docs/SCREENS.md](docs/SCREENS.md) | Before implementing or modifying any UI screen |
 | [docs/API.md](docs/API.md) | Before implementing any backend route or frontend API call |
 | [docs/CHANGELOG.md](docs/CHANGELOG.md) | To understand what has been done and what is planned |
+| [docs/BUGS.md](docs/CHANGELOG.md) | All Identified and known Bugs are listed here, only the open ones |
+
 
 **Always read the relevant doc(s) before writing code. Do not rely on memory alone.**
 

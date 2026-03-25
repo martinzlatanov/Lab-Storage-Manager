@@ -90,7 +90,7 @@ export default async function containersRoutes(app: FastifyInstance) {
   // ── POST /api/v1/containers ────────────────────────────────────────────────
   app.post(
     "/containers",
-    { preHandler: [app.authenticate, app.requireRole("USER")] },
+    { preHandler: [app.authenticate, app.requireRole("USER", "ADMIN")] },
     async (req, reply) => {
       const body = CreateContainerBody.safeParse(req.body);
       if (!body.success) {
@@ -203,7 +203,7 @@ export default async function containersRoutes(app: FastifyInstance) {
   // ── PATCH /api/v1/containers/:id ──────────────────────────────────────────
   app.patch(
     "/containers/:id",
-    { preHandler: [app.authenticate, app.requireRole("USER")] },
+    { preHandler: [app.authenticate, app.requireRole("USER", "ADMIN")] },
     async (req, reply) => {
       const { id } = req.params as { id: string };
       const body = UpdateContainerBody.safeParse(req.body);

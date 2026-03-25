@@ -184,14 +184,25 @@ export default async function sitesRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const { areaId } = req.params as { areaId: string };
       const body = CreateLocationBody.safeParse(req.body);
+      
+      console.log(`📍 POST /areas/${areaId}/locations received`)
+      console.log('  Request body:', req.body)
+      console.log('  Parsed body:', body.data ?? body.error)
+      
       if (!body.success) {
+        console.error('  ❌ Validation failed:', body.error)
         return reply.status(400).send({ success: false, error: "Invalid request body" });
       }
+
+      console.log(`  ✅ Validation passed, user: ${req.user?.username}`)
 
       const area = await prisma.storageArea.findUnique({
         where: { id: areaId },
         include: { building: false },
       });
+      
+      console.log(`  Area lookup: ${area ? '✅ found' : '❌ not found'}`, { areaId })
+      
       if (!area) {
         return reply.status(404).send({ success: false, error: "Storage area not found" });
       }
@@ -206,11 +217,15 @@ export default async function sitesRoutes(app: FastifyInstance) {
           },
         },
       });
+      
       if (existing) {
+        console.log('  ⚠️  Location already exists')
         return reply.status(409).send({ success: false, error: "This location already exists" });
       }
 
       const label = `${area.code}-${body.data.row}-${body.data.shelf}-${body.data.level}`;
+      console.log(`  Creating new location: ${label}`)
+      
       const location = await prisma.storageLocation.create({
         data: {
           storageAreaId: areaId,
@@ -220,6 +235,8 @@ export default async function sitesRoutes(app: FastifyInstance) {
           label,
         },
       });
+      
+      console.log('  ✅ Location created in DB:', location)
       return reply.status(201).send({ success: true, data: location });
     }
   );
@@ -227,14 +244,18 @@ export default async function sitesRoutes(app: FastifyInstance) {
   // GET /api/v1/locations (flat list — for dropdowns)
   app.get(
     "/locations",
-    { preHandler: [app.authenticate] },
     async (_req, reply) => {
+      console.log('📍 GET /locations called')
       const locations = await prisma.storageLocation.findMany({
         orderBy: { label: "asc" },
         include: {
           storageArea: { include: { building: { include: { site: true } } } },
         },
       });
+      console.log(`  Found ${locations.length} locations in DB`)
+      if (locations.length > 0) {
+        console.log('  First 3:', locations.slice(0, 3).map(l => `${l.label} (${l.storageArea.building.site.name}/${l.storageArea.building.name})`))
+      }
       const data = locations.map((loc) => ({
         id: loc.id,
         label: loc.label,
@@ -242,6 +263,34 @@ export default async function sitesRoutes(app: FastifyInstance) {
         siteName: loc.storageArea.building.site.name,
       }));
       return reply.send({ success: true, data });
+    }
+  );
+
+  // GET /api/v1/sites/tree — full hierarchy for Location Browser
+  // NOTE: must be registered before /sites/:siteId/... routes to avoid conflict
+  app.get(
+    "/sites/tree",
+    { preHandler: [app.authenticate] },
+    async (_req, reply) => {
+      const sites = await prisma.site.findMany({
+        orderBy: { name: "asc" },
+        include: {
+          buildings: {
+            orderBy: { name: "asc" },
+            include: {
+              storageAreas: {
+                orderBy: { code: "asc" },
+                include: {
+                  locations: {
+                    orderBy: [{ row: "asc" }, { shelf: "asc" }, { level: "asc" }],
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      return reply.send({ success: true, data: sites });
     }
   );
 
