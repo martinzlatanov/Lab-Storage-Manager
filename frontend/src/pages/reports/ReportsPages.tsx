@@ -153,8 +153,8 @@ export function ItemsByLocationPage() {
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-mono font-medium text-blue-600">{item.labIdNumber}</p>
                           <div className="flex items-center gap-2 mt-0.5">
-                            <ItemTypeBadge type={item.itemType} />
-                            <ItemStatusBadge status={item.status} />
+                            <ItemTypeBadge type={item.itemType as ItemType} />
+                            <ItemStatusBadge status={item.status as ItemStatus} />
                           </div>
                         </div>
                       </Link>
@@ -279,7 +279,7 @@ export function ExternalReportPage() {
                         <td className="px-5 py-3.5">
                           <Link to={`/items/${rec.item.id}`} className="font-mono text-blue-600 hover:text-blue-700 font-medium text-xs">{rec.item.labIdNumber}</Link>
                         </td>
-                        <td className="px-5 py-3.5"><ItemTypeBadge type={rec.item.itemType} /></td>
+                        <td className="px-5 py-3.5"><ItemTypeBadge type={rec.item.itemType as ItemType} /></td>
                         <td className="px-5 py-3.5 text-slate-700">{extLoc ? `${extLoc.name} (${extLoc.city})` : '—'}</td>
                         <td className="px-5 py-3.5">
                           {rec.expectedReturnDate ? (
@@ -626,10 +626,10 @@ export function AuditLogPage() {
                       <td colSpan={5} className="text-center py-12 text-slate-400">No records match your filters.</td>
                     </tr>
                   ) : (
-                    apiFiltered.map(op => (
+                    (apiFiltered as AuditReportRecord[]).map(op => (
                       <tr key={op.id} className="hover:bg-slate-50 transition-colors">
                         <td className="px-5 py-3.5 text-xs text-slate-500 whitespace-nowrap">{formatDate(op.performedAt, true)}</td>
-                        <td className="px-5 py-3.5"><OperationBadge type={op.operationType} /></td>
+                        <td className="px-5 py-3.5"><OperationBadge type={op.operationType as OperationType} /></td>
                         <td className="px-5 py-3.5">
                           <Link to={`/items/${op.item.id}`} className="font-mono text-blue-600 hover:text-blue-700 text-xs font-medium">
                             {op.item.labIdNumber}

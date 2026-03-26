@@ -34,12 +34,6 @@ function getItemLocation(item: AnyItem): string {
   return ''
 }
 
-function getItemContainer(item: AnyItem): string {
-  const asAny = item as Record<string, any>
-  if (asAny.container?.label) return asAny.container.label
-  if (asAny.containerLabel) return asAny.containerLabel
-  return ''
-}
 
 type SortField = 'labIdNumber' | 'itemType' | 'name' | 'status' | 'location' | 'updatedAt'
 

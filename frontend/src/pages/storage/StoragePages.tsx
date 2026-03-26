@@ -317,16 +317,12 @@ function AddContainerModal({ onClose, onCreated }: AddContainerModalProps) {
     setError(null)
 
     if (USE_MOCKS) {
-      const now = new Date().toISOString()
       const mockId = `c${Date.now()}`
       const newContainer: Container = {
         id: mockId,
         barcode: barcode.trim(),
         label: label.trim(),
         notes: notes.trim() || undefined,
-        createdAt: now,
-        updatedAt: now,
-        createdById: 'u1',
       }
       onCreated(newContainer)
       return
