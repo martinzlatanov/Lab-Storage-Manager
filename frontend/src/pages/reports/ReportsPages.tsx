@@ -3,7 +3,7 @@
  * ItemsByLocationPage, ExternalReportPage, ExpiryReportPage, AuditLogPage
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { AlertTriangle, Clock, Download, ChevronDown, Loader2 } from 'lucide-react'
 import { Card, CardHeader } from '../../components/ui/Card'
@@ -176,6 +176,19 @@ export function ExternalReportPage() {
   const [loading, setLoading] = useState(!USE_MOCKS)
   const [error, setError] = useState('')
   const [apiData, setApiData] = useState<ExternalReport['data']>([])
+  const [colWidths, setColWidths] = useState([90, 110, 200, 130, 90])
+  const resizeRef = useRef<{ col: number; startX: number; startWidth: number } | null>(null)
+  useEffect(() => {
+    function onMouseMove(e: MouseEvent) {
+      if (!resizeRef.current) return
+      const { col, startX, startWidth } = resizeRef.current
+      setColWidths(prev => { const n = [...prev]; n[col] = Math.max(60, startWidth + (e.clientX - startX)); return n })
+    }
+    function onMouseUp() { if (!resizeRef.current) return; resizeRef.current = null; document.body.style.cursor = ''; document.body.style.userSelect = '' }
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
+    return () => { document.removeEventListener('mousemove', onMouseMove); document.removeEventListener('mouseup', onMouseUp) }
+  }, [])
 
   useEffect(() => {
     if (USE_MOCKS) return
@@ -232,14 +245,18 @@ export function ExternalReportPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="text-sm" style={{ tableLayout: 'fixed', width: colWidths.reduce((s, w) => s + w, 0) }}>
+              <colgroup>{colWidths.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
               <thead>
                 <tr className="border-b border-slate-100 text-left">
-                  <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Lab ID</th>
-                  <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
-                  <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">External Location</th>
-                  <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Expected Return</th>
-                  <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+                  {(['Lab ID', 'Type', 'External Location', 'Expected Return', 'Status'] as const).map((label, i) => (
+                    <th key={i} className="relative px-3 py-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wide select-none overflow-hidden whitespace-nowrap">
+                      <span className="block overflow-hidden">{label}</span>
+                      <div className="absolute right-0 top-0 h-full w-2 cursor-col-resize flex items-center justify-center group/handle" onMouseDown={e => { e.preventDefault(); resizeRef.current = { col: i, startX: e.clientX, startWidth: colWidths[i] }; document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none' }}>
+                        <div className="w-px h-4 bg-slate-200 group-hover/handle:bg-blue-400 transition-colors" />
+                      </div>
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -249,20 +266,20 @@ export function ExternalReportPage() {
                     const exitOp = MOCK_OPERATIONS.find(op => op.itemId === item.id && op.operationType === OperationType.TEMP_EXIT)
                     return (
                       <tr key={item.id} className={clsx('hover:bg-slate-50 transition-colors', isOverdue && 'bg-red-50/30')}>
-                        <td className="px-5 py-3.5">
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap">
                           <Link to={`/items/${item.id}`} className="font-mono text-blue-600 hover:text-blue-700 font-medium text-xs">{item.labIdNumber}</Link>
                         </td>
-                        <td className="px-5 py-3.5"><ItemTypeBadge type={item.itemType} /></td>
-                        <td className="px-5 py-3.5 text-slate-700">{item.externalLocationName}</td>
-                        <td className="px-5 py-3.5">
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap"><ItemTypeBadge type={item.itemType} /></td>
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap text-slate-700">{item.externalLocationName}</td>
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap">
                           {exitOp?.expectedReturnDate ? (
-                            <span className={clsx('text-sm font-medium', isOverdue ? 'text-red-600' : 'text-slate-600')}>
-                              {isOverdue && <AlertTriangle size={12} className="inline mr-1" />}
+                            <span className={clsx('text-xs font-medium', isOverdue ? 'text-red-600' : 'text-slate-600')}>
+                              {isOverdue && <AlertTriangle size={11} className="inline mr-1" />}
                               {formatDate(exitOp.expectedReturnDate)}
                             </span>
                           ) : '—'}
                         </td>
-                        <td className="px-5 py-3.5">
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap">
                           {isOverdue
                             ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">Overdue</span>
                             : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700"><Clock size={10} />Away</span>
@@ -276,20 +293,20 @@ export function ExternalReportPage() {
                     const extLoc = rec.item.externalLocation ?? rec.toExternalLocation
                     return (
                       <tr key={rec.id} className={clsx('hover:bg-slate-50 transition-colors', rec.isOverdue && 'bg-red-50/30')}>
-                        <td className="px-5 py-3.5">
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap">
                           <Link to={`/items/${rec.item.id}`} className="font-mono text-blue-600 hover:text-blue-700 font-medium text-xs">{rec.item.labIdNumber}</Link>
                         </td>
-                        <td className="px-5 py-3.5"><ItemTypeBadge type={rec.item.itemType as ItemType} /></td>
-                        <td className="px-5 py-3.5 text-slate-700">{extLoc ? `${extLoc.name} (${extLoc.city})` : '—'}</td>
-                        <td className="px-5 py-3.5">
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap"><ItemTypeBadge type={rec.item.itemType as ItemType} /></td>
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap text-slate-700">{extLoc ? `${extLoc.name} (${extLoc.city})` : '—'}</td>
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap">
                           {rec.expectedReturnDate ? (
-                            <span className={clsx('text-sm font-medium', rec.isOverdue ? 'text-red-600' : 'text-slate-600')}>
-                              {rec.isOverdue && <AlertTriangle size={12} className="inline mr-1" />}
+                            <span className={clsx('text-xs font-medium', rec.isOverdue ? 'text-red-600' : 'text-slate-600')}>
+                              {rec.isOverdue && <AlertTriangle size={11} className="inline mr-1" />}
                               {formatDate(rec.expectedReturnDate)}
                             </span>
                           ) : '—'}
                         </td>
-                        <td className="px-5 py-3.5">
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap">
                           {rec.isOverdue
                             ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">Overdue</span>
                             : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700"><Clock size={10} />Away</span>
@@ -314,6 +331,19 @@ export function ExpiryReportPage() {
   const [loading, setLoading] = useState(!USE_MOCKS)
   const [error, setError] = useState('')
   const [apiItems, setApiItems] = useState<ExpiryReportItem[]>([])
+  const [colWidths, setColWidths] = useState([90, 160, 90, 110, 110, 80, 140])
+  const resizeRef = useRef<{ col: number; startX: number; startWidth: number } | null>(null)
+  useEffect(() => {
+    function onMouseMove(e: MouseEvent) {
+      if (!resizeRef.current) return
+      const { col, startX, startWidth } = resizeRef.current
+      setColWidths(prev => { const n = [...prev]; n[col] = Math.max(60, startWidth + (e.clientX - startX)); return n })
+    }
+    function onMouseUp() { if (!resizeRef.current) return; resizeRef.current = null; document.body.style.cursor = ''; document.body.style.userSelect = '' }
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
+    return () => { document.removeEventListener('mousemove', onMouseMove); document.removeEventListener('mouseup', onMouseUp) }
+  }, [])
 
   useEffect(() => {
     if (USE_MOCKS) return
@@ -407,16 +437,18 @@ export function ExpiryReportPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="text-sm" style={{ tableLayout: 'fixed', width: colWidths.reduce((s, w) => s + w, 0) }}>
+              <colgroup>{colWidths.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
               <thead>
                 <tr className="border-b border-slate-100 text-left">
-                  <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Lab ID</th>
-                  <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
-                  <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Quantity</th>
-                  <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Lot #</th>
-                  <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Expiry Date</th>
-                  <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Days Left</th>
-                  <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Location</th>
+                  {(['Lab ID', 'Type', 'Quantity', 'Lot #', 'Expiry Date', 'Days Left', 'Location'] as const).map((label, i) => (
+                    <th key={i} className="relative px-3 py-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wide select-none overflow-hidden whitespace-nowrap">
+                      <span className="block overflow-hidden">{label}</span>
+                      <div className="absolute right-0 top-0 h-full w-2 cursor-col-resize flex items-center justify-center group/handle" onMouseDown={e => { e.preventDefault(); resizeRef.current = { col: i, startX: e.clientX, startWidth: colWidths[i] }; document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none' }}>
+                        <div className="w-px h-4 bg-slate-200 group-hover/handle:bg-blue-400 transition-colors" />
+                      </div>
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -426,19 +458,19 @@ export function ExpiryReportPage() {
                     const rowBg = days !== null && days < 0 ? 'bg-red-50/50' : days !== null && days <= 7 ? 'bg-orange-50/50' : ''
                     return (
                       <tr key={c.id} className={clsx('hover:bg-slate-50 transition-colors', rowBg)}>
-                        <td className="px-5 py-3.5">
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap">
                           <Link to={`/items/${c.id}`} className="font-mono text-blue-600 hover:text-blue-700 font-medium text-xs">{c.labIdNumber}</Link>
                         </td>
-                        <td className="px-5 py-3.5 text-slate-700">{c.consumableType}</td>
-                        <td className="px-5 py-3.5">
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap text-slate-700">{c.consumableType}</td>
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap">
                           <span className={clsx('font-medium', c.status === ItemStatus.DEPLETED ? 'text-slate-400 line-through' : 'text-slate-800')}>
                             {c.quantity} {c.unit}
                           </span>
                         </td>
-                        <td className="px-5 py-3.5 text-slate-500 font-mono text-xs">{c.lotNumber ?? '—'}</td>
-                        <td className="px-5 py-3.5 text-slate-600">{c.expiryDate ? formatDate(c.expiryDate) : '—'}</td>
-                        <td className={clsx('px-5 py-3.5 font-semibold', color)}>{label}</td>
-                        <td className="px-5 py-3.5 text-slate-500 text-xs font-mono">{c.locationLabel ?? '—'}</td>
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap text-slate-500 font-mono text-xs">{c.lotNumber ?? '—'}</td>
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap text-slate-600">{c.expiryDate ? formatDate(c.expiryDate) : '—'}</td>
+                        <td className={clsx('px-3 py-1 overflow-hidden whitespace-nowrap font-semibold', color)}>{label}</td>
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap text-slate-500 text-xs font-mono">{c.locationLabel ?? '—'}</td>
                       </tr>
                     )
                   })
@@ -449,21 +481,21 @@ export function ExpiryReportPage() {
                     const locLabel = item.location?.label ?? item.container?.label ?? '—'
                     return (
                       <tr key={item.id} className={clsx('hover:bg-slate-50 transition-colors', rowBg)}>
-                        <td className="px-5 py-3.5">
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap">
                           <Link to={`/items/${item.id}`} className="font-mono text-blue-600 hover:text-blue-700 font-medium text-xs">{item.labIdNumber}</Link>
                         </td>
-                        <td className="px-5 py-3.5 text-slate-700">{item.consumableType ?? '—'}</td>
-                        <td className="px-5 py-3.5">
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap text-slate-700">{item.consumableType ?? '—'}</td>
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap">
                           <span className={clsx('font-medium', item.status === ItemStatus.DEPLETED ? 'text-slate-400 line-through' : 'text-slate-800')}>
                             {item.quantity} {item.unit}
                           </span>
                         </td>
-                        <td className="px-5 py-3.5 text-slate-500 font-mono text-xs">{item.lotNumber ?? '—'}</td>
-                        <td className="px-5 py-3.5 text-slate-600">{item.expiryDate ? formatDate(item.expiryDate) : '—'}</td>
-                        <td className={clsx('px-5 py-3.5 font-semibold', getApiExpiryColor(days))}>
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap text-slate-500 font-mono text-xs">{item.lotNumber ?? '—'}</td>
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap text-slate-600">{item.expiryDate ? formatDate(item.expiryDate) : '—'}</td>
+                        <td className={clsx('px-3 py-1 overflow-hidden whitespace-nowrap font-semibold', getApiExpiryColor(days))}>
                           {days === null || days === undefined ? 'No expiry' : days < 0 ? 'Expired' : `${days}d`}
                         </td>
-                        <td className="px-5 py-3.5 text-slate-500 text-xs font-mono">{locLabel}</td>
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap text-slate-500 text-xs font-mono">{locLabel}</td>
                       </tr>
                     )
                   })
@@ -486,6 +518,19 @@ export function AuditLogPage() {
   const [error, setError] = useState('')
   const [apiRecords, setApiRecords] = useState<AuditReportRecord[]>([])
   const [total, setTotal] = useState(0)
+  const [colWidths, setColWidths] = useState([130, 100, 90, 130, 280])
+  const resizeRef = useRef<{ col: number; startX: number; startWidth: number } | null>(null)
+  useEffect(() => {
+    function onMouseMove(e: MouseEvent) {
+      if (!resizeRef.current) return
+      const { col, startX, startWidth } = resizeRef.current
+      setColWidths(prev => { const n = [...prev]; n[col] = Math.max(60, startWidth + (e.clientX - startX)); return n })
+    }
+    function onMouseUp() { if (!resizeRef.current) return; resizeRef.current = null; document.body.style.cursor = ''; document.body.style.userSelect = '' }
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
+    return () => { document.removeEventListener('mousemove', onMouseMove); document.removeEventListener('mouseup', onMouseUp) }
+  }, [])
 
   const fetchAudit = useCallback(async () => {
     if (USE_MOCKS) return
@@ -585,32 +630,34 @@ export function AuditLogPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="text-sm" style={{ tableLayout: 'fixed', width: colWidths.reduce((s, w) => s + w, 0) }}>
+              <colgroup>{colWidths.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
               <thead>
                 <tr className="border-b border-slate-100 text-left">
-                  <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Date / Time</th>
-                  <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Operation</th>
-                  <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Item</th>
-                  <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Performed by</th>
-                  <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Details</th>
+                  {(['Date / Time', 'Operation', 'Item', 'Performed by', 'Details'] as const).map((label, i) => (
+                    <th key={i} className="relative px-3 py-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wide select-none overflow-hidden whitespace-nowrap">
+                      <span className="block overflow-hidden">{label}</span>
+                      <div className="absolute right-0 top-0 h-full w-2 cursor-col-resize flex items-center justify-center group/handle" onMouseDown={e => { e.preventDefault(); resizeRef.current = { col: i, startX: e.clientX, startWidth: colWidths[i] }; document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none' }}>
+                        <div className="w-px h-4 bg-slate-200 group-hover/handle:bg-blue-400 transition-colors" />
+                      </div>
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {USE_MOCKS ? (
                   mockFiltered.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="text-center py-12 text-slate-400">No records match your filters.</td>
-                    </tr>
+                    <tr><td colSpan={5} className="text-center py-8 text-slate-400">No records match your filters.</td></tr>
                   ) : (
                     mockFiltered.map(op => (
                       <tr key={op.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-5 py-3.5 text-xs text-slate-500 whitespace-nowrap">{formatDate(op.performedAt, true)}</td>
-                        <td className="px-5 py-3.5"><OperationBadge type={op.operationType} /></td>
-                        <td className="px-5 py-3.5">
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap text-xs text-slate-500">{formatDate(op.performedAt, true)}</td>
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap"><OperationBadge type={op.operationType} /></td>
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap">
                           <Link to={`/items/${op.itemId}`} className="font-mono text-blue-600 hover:text-blue-700 text-xs font-medium">{op.itemLabId}</Link>
                         </td>
-                        <td className="px-5 py-3.5 text-slate-600 text-xs">{op.performedByName}</td>
-                        <td className="px-5 py-3.5 text-xs text-slate-500">
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap text-slate-600 text-xs">{op.performedByName}</td>
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap text-xs text-slate-500">
                           {op.toLocationLabel && <span>→ <span className="font-mono">{op.toLocationLabel}</span></span>}
                           {op.toExternalLocationName && <span className="text-yellow-600">→ {op.toExternalLocationName}</span>}
                           {op.quantityConsumed !== undefined && <span className="text-orange-600">Consumed {op.quantityConsumed}</span>}
@@ -622,21 +669,17 @@ export function AuditLogPage() {
                   )
                 ) : (
                   apiFiltered.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="text-center py-12 text-slate-400">No records match your filters.</td>
-                    </tr>
+                    <tr><td colSpan={5} className="text-center py-8 text-slate-400">No records match your filters.</td></tr>
                   ) : (
                     (apiFiltered as AuditReportRecord[]).map(op => (
                       <tr key={op.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-5 py-3.5 text-xs text-slate-500 whitespace-nowrap">{formatDate(op.performedAt, true)}</td>
-                        <td className="px-5 py-3.5"><OperationBadge type={op.operationType as OperationType} /></td>
-                        <td className="px-5 py-3.5">
-                          <Link to={`/items/${op.item.id}`} className="font-mono text-blue-600 hover:text-blue-700 text-xs font-medium">
-                            {op.item.labIdNumber}
-                          </Link>
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap text-xs text-slate-500">{formatDate(op.performedAt, true)}</td>
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap"><OperationBadge type={op.operationType as OperationType} /></td>
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap">
+                          <Link to={`/items/${op.item.id}`} className="font-mono text-blue-600 hover:text-blue-700 text-xs font-medium">{op.item.labIdNumber}</Link>
                         </td>
-                        <td className="px-5 py-3.5 text-slate-600 text-xs">{op.performedBy.displayName}</td>
-                        <td className="px-5 py-3.5 text-xs text-slate-500">
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap text-slate-600 text-xs">{op.performedBy.displayName}</td>
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap text-xs text-slate-500">
                           {op.toLocation && <span>→ <span className="font-mono">{op.toLocation.label}</span></span>}
                           {op.toExternalLocation && <span className="text-yellow-600">→ {op.toExternalLocation.name}</span>}
                           {op.quantityConsumed !== undefined && <span className="text-orange-600">Consumed {op.quantityConsumed}</span>}

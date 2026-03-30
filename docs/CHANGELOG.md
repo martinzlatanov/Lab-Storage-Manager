@@ -6,6 +6,22 @@
 
 ---
 
+## [2026-03-30] — All Tables: Dense View, No Word Wrap & Resizable Columns
+
+### Changed
+- `frontend/src/pages/reports/ReportsPages.tsx`: Applied condensed table treatment to all 3 report tables.
+  - **ExternalReportPage** (5 cols): Lab ID 90 / Type 110 / External Location 200 / Expected Return 130 / Status 90px defaults.
+  - **ExpiryReportPage** (7 cols): Lab ID 90 / Type 160 / Quantity 90 / Lot# 110 / Expiry Date 110 / Days Left 80 / Location 140px defaults.
+  - **AuditLogPage** (5 cols): Date/Time 130 / Operation 100 / Item 90 / Performed by 130 / Details 280px defaults.
+  - All cells: `px-3 py-1 overflow-hidden whitespace-nowrap` — single-line rows, hard clip at column edge.
+  - All headers: `px-3 py-1.5` with drag-to-resize handle (60px minimum per column).
+  - `table-layout: fixed` + `<colgroup>` on every table; `useRef` + `useEffect` resize logic per component.
+- `frontend/src/pages/admin/AdminPages.tsx`: Applied same treatment to `UserManagementPage` table.
+  - 5 cols: User 200 / Role 100 / Site 130 / Status 90 / Actions 160px defaults.
+  - Avatar reduced from 8×8 to 6×6 to fit condensed row height; button padding tightened to `py-0.5`.
+
+---
+
 ## [2026-03-30] — Item List UI: Dense View & Resizable Columns
 
 ### Changed

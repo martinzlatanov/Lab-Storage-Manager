@@ -3,7 +3,7 @@
  * UserManagementPage, LocationConfigPage, ExternalLocationAdminPage, SystemSettingsPage
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Plus, Shield, User, Eye, CheckCircle2, XCircle, Pencil, Save, X, ChevronRight, AlertCircle, Loader2 } from 'lucide-react'
 import { Card, CardHeader } from '../../components/ui/Card'
 import { Badge } from '../../components/ui/Badge'
@@ -40,6 +40,19 @@ export function UserManagementPage() {
   const [editingRole, setEditingRole] = useState<UserRole>(UserRole.USER)
   const [saving, setSaving] = useState(false)
   const [actionError, setActionError] = useState('')
+  const [colWidths, setColWidths] = useState([200, 100, 130, 90, 160])
+  const resizeRef = useRef<{ col: number; startX: number; startWidth: number } | null>(null)
+  useEffect(() => {
+    function onMouseMove(e: MouseEvent) {
+      if (!resizeRef.current) return
+      const { col, startX, startWidth } = resizeRef.current
+      setColWidths(prev => { const n = [...prev]; n[col] = Math.max(60, startWidth + (e.clientX - startX)); return n })
+    }
+    function onMouseUp() { if (!resizeRef.current) return; resizeRef.current = null; document.body.style.cursor = ''; document.body.style.userSelect = '' }
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
+    return () => { document.removeEventListener('mousemove', onMouseMove); document.removeEventListener('mouseup', onMouseUp) }
+  }, [])
 
   useEffect(() => {
     if (USE_MOCKS) return
@@ -96,36 +109,40 @@ export function UserManagementPage() {
       <Card>
         <CardHeader title="Users" subtitle={`${users.length} total · ${users.filter(u => u.isActive).length} active`} />
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="text-sm" style={{ tableLayout: 'fixed', width: colWidths.reduce((s, w) => s + w, 0) }}>
+            <colgroup>{colWidths.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
             <thead>
               <tr className="border-b border-slate-100 text-left">
-                <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">User</th>
-                <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Role</th>
-                <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Site</th>
-                <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-                <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>
+                {(['User', 'Role', 'Site', 'Status', 'Actions'] as const).map((label, i) => (
+                  <th key={i} className="relative px-3 py-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wide select-none overflow-hidden whitespace-nowrap">
+                    <span className="block overflow-hidden">{label}</span>
+                    <div className="absolute right-0 top-0 h-full w-2 cursor-col-resize flex items-center justify-center group/handle" onMouseDown={e => { e.preventDefault(); resizeRef.current = { col: i, startX: e.clientX, startWidth: colWidths[i] }; document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none' }}>
+                      <div className="w-px h-4 bg-slate-200 group-hover/handle:bg-blue-400 transition-colors" />
+                    </div>
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {users.map(user => (
                 <tr key={user.id} className={clsx('hover:bg-slate-50 transition-colors', !user.isActive && 'opacity-60')}>
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center text-blue-600 text-xs font-bold shrink-0">
+                  <td className="px-3 py-1 overflow-hidden whitespace-nowrap">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center text-blue-600 text-xs font-bold shrink-0">
                         {user.displayName.split(' ').map(n => n[0]).join('')}
                       </div>
-                      <div>
-                        <p className="font-medium text-slate-800">{user.displayName}</p>
-                        <p className="text-xs text-slate-400 font-mono">{user.ldapUsername}</p>
+                      <div className="min-w-0 overflow-hidden">
+                        <p className="font-medium text-slate-800 truncate text-xs">{user.displayName}</p>
+                        <p className="text-xs text-slate-400 font-mono truncate">{user.ldapUsername}</p>
                       </div>
                     </div>
                   </td>
-                  <td className="px-5 py-3.5">
+                  <td className="px-3 py-1 overflow-hidden whitespace-nowrap">
                     {editingId === user.id ? (
                       <select
                         value={editingRole}
                         onChange={e => setEditingRole(e.target.value as UserRole)}
-                        className="border border-slate-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="border border-slate-200 rounded-lg px-2 py-0.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value={UserRole.VIEWER}>Viewer</option>
                         <option value={UserRole.USER}>User</option>
@@ -135,45 +152,45 @@ export function UserManagementPage() {
                       <RoleBadge role={user.role} />
                     )}
                   </td>
-                  <td className="px-5 py-3.5 text-slate-600 text-sm">
+                  <td className="px-3 py-1 overflow-hidden whitespace-nowrap text-slate-600 text-xs">
                     {MOCK_SITES.find(s => s.id === user.siteId)?.name ?? <span className="text-slate-400">Global</span>}
                   </td>
-                  <td className="px-5 py-3.5">
+                  <td className="px-3 py-1 overflow-hidden whitespace-nowrap">
                     {user.isActive
-                      ? <span className="flex items-center gap-1.5 text-xs text-green-600"><CheckCircle2 size={13} />Active</span>
-                      : <span className="flex items-center gap-1.5 text-xs text-slate-400"><XCircle size={13} />Inactive</span>
+                      ? <span className="flex items-center gap-1 text-xs text-green-600"><CheckCircle2 size={12} />Active</span>
+                      : <span className="flex items-center gap-1 text-xs text-slate-400"><XCircle size={12} />Inactive</span>
                     }
                   </td>
-                  <td className="px-5 py-3.5">
+                  <td className="px-3 py-1 overflow-hidden whitespace-nowrap">
                     <div className="flex items-center gap-1">
                       {editingId === user.id ? (
                         <>
                           <button
                             onClick={() => handleSaveRole(user.id)}
                             disabled={saving}
-                            className="flex items-center gap-1 px-2.5 py-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-lg text-xs transition-colors"
+                            className="flex items-center gap-1 px-2 py-0.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded text-xs transition-colors"
                           >
-                            {saving ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />} Save
+                            {saving ? <Loader2 size={10} className="animate-spin" /> : <Save size={10} />} Save
                           </button>
                           <button
                             onClick={() => setEditingId(null)}
-                            className="flex items-center gap-1 px-2.5 py-1 border border-slate-200 text-slate-600 rounded-lg text-xs hover:bg-slate-50 transition-colors"
+                            className="flex items-center gap-1 px-2 py-0.5 border border-slate-200 text-slate-600 rounded text-xs hover:bg-slate-50 transition-colors"
                           >
-                            <X size={11} />
+                            <X size={10} />
                           </button>
                         </>
                       ) : (
                         <>
                           <button
                             onClick={() => { setEditingId(user.id); setEditingRole(user.role) }}
-                            className="flex items-center gap-1 px-2.5 py-1 border border-slate-200 text-slate-600 rounded-lg text-xs hover:bg-slate-50 transition-colors"
+                            className="flex items-center gap-1 px-2 py-0.5 border border-slate-200 text-slate-600 rounded text-xs hover:bg-slate-50 transition-colors"
                           >
-                            <Pencil size={11} /> Edit
+                            <Pencil size={10} /> Edit
                           </button>
                           {user.isActive && (
                             <button
                               onClick={() => handleDeactivate(user.id)}
-                              className="px-2.5 py-1 border border-slate-200 text-slate-500 rounded-lg text-xs hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors"
+                              className="px-2 py-0.5 border border-slate-200 text-slate-500 rounded text-xs hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors"
                             >
                               Deactivate
                             </button>
