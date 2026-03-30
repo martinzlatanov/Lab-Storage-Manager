@@ -6,6 +6,35 @@
 
 ---
 
+## [2026-03-30] — Item List UI: Dense View & Resizable Columns
+
+### Changed
+- `frontend/src/pages/items/ItemListPage.tsx`: Redesigned table for higher information density and usability.
+  - Reduced all padding (toolbar controls `py-2` → `py-1`, row cells `py-3.5` → `py-1`, header `py-3` → `py-1.5`, overall spacing `space-y-4` → `space-y-2`).
+  - Columns are now resizable via drag handles on each header's right edge; widths stored in component state with a 60px minimum. Default widths: Lab ID 100px, Type 120px, Name 260px, Status 110px, Location 150px, Updated 100px.
+  - Table uses `table-layout: fixed` with a `<colgroup>` so column widths are respected exactly.
+  - All cells use `overflow: hidden` + `whitespace: nowrap` — text is clipped at the column boundary with no word wrap.
+  - Removed `max-w-xs truncate` from the Name cell (width is now controlled by the column, not a Tailwind max-width class).
+
+---
+
+## [2026-03-30] — Dev Auth Bypass & Auto-Login
+
+### Changed
+- `backend/src/routes/auth.ts`: LDAP call is now conditional on `DEV_AUTH != "true"`. When `DEV_AUTH=true`, any password is accepted; user is looked up by username in the DB or auto-created with `ADMIN` role. LDAP library is only imported dynamically when actually needed (production mode).
+- `frontend/src/context/AuthContext.tsx`: Restored real JWT auth flow (replaced previous dev no-op). Added dev auto-login: when `VITE_DEV_AUTO_LOGIN=true`, the app silently calls `/auth/login` on mount with dev credentials and skips the login page entirely. Existing session from `localStorage` is reused on refresh.
+- `backend/.env`: Added `DEV_AUTH=true` flag.
+- `frontend/.env`: Added `VITE_DEV_AUTO_LOGIN=true`, `VITE_DEV_USERNAME=admin`, `VITE_DEV_PASSWORD=admin` flags.
+
+### Fixed
+- "Session expired" error on every page load caused by `AuthContext` being in a no-op dev bypass while `VITE_USE_MOCKS=false` — API calls had no JWT token, backend returned 401 on every request.
+- Item list (and all other pages) showing empty/error state for the same reason.
+
+### Decided
+- [Decision ADC-12](DECISIONS.md#2026-03-30--dev-auth-bypass-strategy): Environment-flag-gated dev auth bypass on both backend and frontend; disabled by removing flags for production.
+
+---
+
 ## [2026-03-25] — Frontend Bug Fix Pass (BUG-003 – BUG-020)
 
 ### Fixed

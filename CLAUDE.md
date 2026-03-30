@@ -21,10 +21,21 @@
 | [docs/SCREENS.md](docs/SCREENS.md) | Before implementing or modifying any UI screen |
 | [docs/API.md](docs/API.md) | Before implementing any backend route or frontend API call |
 | [docs/CHANGELOG.md](docs/CHANGELOG.md) | To understand what has been done and what is planned |
-| [docs/BUGS.md](docs/CHANGELOG.md) | All Identified and known Bugs are listed here, only the open ones |
+| [docs/BUGS.md](docs/BUGS.md) | All identified and known bugs — only open ones |
 
 
 **Always read the relevant doc(s) before writing code. Do not rely on memory alone.**
+
+---
+
+## Mandatory After Every Code Change
+
+**After completing any code change — no matter how small — always update `docs/CHANGELOG.md` before finishing.**
+
+- Add an entry under today's date (`## [YYYY-MM-DD]`) if one doesn't exist yet, or append to the existing one.
+- Use standard sections: `### Added`, `### Changed`, `### Fixed`, `### Decided` as appropriate.
+- Include the file(s) changed and a concise description of what changed and why.
+- Do not wait to be asked. This is not optional.
 
 ---
 

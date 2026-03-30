@@ -2,7 +2,6 @@ import type { FastifyInstance } from "fastify";
 import { createSigner, createVerifier } from "fast-jwt";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
-import { ldapAuthenticate } from "../lib/ldap.js";
 import type { JwtPayload } from "../types/index.js";
 
 const LoginBody = z.object({
@@ -24,30 +23,40 @@ export default async function authRoutes(app: FastifyInstance) {
 
     const { username, password } = body.data;
 
-    // 1. Verify credentials against Active Directory
-    let ldapUser;
-    try {
-      ldapUser = await ldapAuthenticate(username, password);
-    } catch (err) {
-      app.log.warn({ username }, "LDAP authentication failed");
-      return reply.status(401).send({ success: false, error: "Invalid credentials" });
+    // 1. Verify credentials
+    if (process.env.DEV_AUTH === "true") {
+      // DEV MODE: skip LDAP — any password accepted, auto-create ADMIN user
+      app.log.warn({ username }, "DEV_AUTH enabled — skipping LDAP");
+    } else {
+      // PRODUCTION: verify against Active Directory
+      const { ldapAuthenticate } = await import("../lib/ldap.js");
+      let ldapUser;
+      try {
+        ldapUser = await ldapAuthenticate(username, password);
+      } catch (err) {
+        app.log.warn({ username }, "LDAP authentication failed");
+        return reply.status(401).send({ success: false, error: "Invalid credentials" });
+      }
+      // Overwrite username/password.data with LDAP-resolved values
+      body.data.username = ldapUser.username;
     }
 
-    // 2. Find or create user in local DB (first login auto-provisions the account)
+    // 2. Find or create user in local DB
     let user = await prisma.user.findUnique({
-      where: { ldapUsername: ldapUser.username },
+      where: { ldapUsername: username },
     });
 
     if (!user) {
+      const role = process.env.DEV_AUTH === "true" ? "ADMIN" : "USER";
       user = await prisma.user.create({
         data: {
-          ldapUsername: ldapUser.username,
-          displayName: ldapUser.displayName,
-          email: ldapUser.email,
-          role: "USER", // default role — admin must elevate
+          ldapUsername: username,
+          displayName: username,
+          email: `${username}@dev.local`,
+          role,
         },
       });
-      app.log.info({ userId: user.id }, "Auto-provisioned new user from LDAP");
+      app.log.info({ userId: user.id }, `Auto-provisioned user (role: ${role})`);
     }
 
     if (!user.isActive) {

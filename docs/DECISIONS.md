@@ -5,6 +5,27 @@
 
 ---
 
+## 2026-03-30 — Dev Auth Bypass Strategy
+
+**Decision:** Gate dev auth behind `DEV_AUTH=true` (backend) and `VITE_DEV_AUTO_LOGIN=true` (frontend) env flags. When enabled: backend skips LDAP and accepts any password; frontend silently auto-logs in on app mount as the configured dev user (default: `admin`/`admin`).
+
+**Problem:** LDAP is unavailable during local development. Previous workarounds (hard-coded dev user in `auth.ts`, no-op `login()` in `AuthContext`) were leaking into production paths or leaving the API client without tokens, causing 401 errors on every page.
+
+**Alternatives considered:**
+- Option A (chosen): Env-flag bypass on both ends — explicit opt-in, easy to audit, zero risk of leaking to production unless env vars are set
+- Option B: Separate `/auth/dev-token` endpoint — cleaner URL surface, but adds a permanent route that must be disabled/hidden in prod
+- Option C: `VITE_USE_MOCKS=true` everywhere — avoids auth entirely but disconnects frontend from real backend behavior, masking integration bugs
+
+**Rationale:**
+- Env flags are the standard dev-vs-prod toggle; they are explicitly excluded from production deployments
+- Auto-login on mount means the login page is never shown during development — zero friction
+- Backend auto-creates the admin user on first login, so no manual DB seed step is required
+- LDAP import is deferred (dynamic `import()`) in the production path — no connection attempt is made at all when `DEV_AUTH` is not set
+
+**To disable for production:** remove `DEV_AUTH` from `backend/.env` and `VITE_DEV_AUTO_LOGIN` from `frontend/.env`.
+
+---
+
 ## 2026-03-24 — Location Dropdown Auto-Refresh Polling
 
 **Decision:** Implement 5-second client-side polling for location dropdowns in AddItemPage and OperationsPages to automatically reflect newly created locations from Admin Locations Config page.

@@ -18,9 +18,9 @@
 
 | Method | Route | Role | Description | Status |
 |---|---|---|---|---|
-| POST | `/auth/login` | PUBLIC | LDAP auth → returns JWT | ✅ |
-| POST | `/auth/refresh` | All | Refresh access token | 🔲 |
-| POST | `/auth/logout` | All | Invalidate refresh token | 🔲 |
+| POST | `/auth/login` | PUBLIC | LDAP auth → returns JWT + refresh token | ✅ |
+| POST | `/auth/refresh` | All | Rotate refresh token → new access + refresh tokens | ✅ |
+| POST | `/auth/logout` | All | Revoke refresh token (requires auth) | ✅ |
 
 ---
 
@@ -41,16 +41,19 @@
 
 | Method | Route | Role | Description | Status |
 |---|---|---|---|---|
-| GET | `/sites` | All | List all sites | ✅ |
+| GET | `/sites` | All | List all sites (includes buildings) | ✅ |
 | POST | `/sites` | Admin | Create site | ✅ |
-| GET | `/sites/:id/buildings` | All | List buildings in site | ✅ |
+| GET | `/sites/tree` | All | Full hierarchy (sites→buildings→areas→locations) | ✅ |
+| GET | `/sites/:id/buildings` | All | List buildings in site (includes areas) | ✅ |
 | POST | `/sites/:id/buildings` | Admin | Create building | ✅ |
-| GET | `/buildings/:id/areas` | All | List storage areas in building | ✅ |
+| GET | `/buildings/:id/areas` | All | List storage areas in building (includes locations) | ✅ |
 | POST | `/buildings/:id/areas` | Admin | Create storage area | ✅ |
 | GET | `/areas/:id/locations` | All | List locations in area | ✅ |
 | POST | `/areas/:id/locations` | Admin | Create storage location | ✅ |
-| GET | `/locations/:id` | All | Get location + items there | ✅ |
+| GET | `/locations` | PUBLIC | Flat list of all locations (for dropdowns; includes siteName, buildingName) | ✅ |
+| GET | `/locations/:id` | All | Get location detail + items + containers | ✅ |
 | GET | `/external-locations` | All | List external locations | ✅ |
+| GET | `/external-locations/:id` | All | Get external location detail + items in TEMP_EXIT | ✅ |
 | POST | `/external-locations` | Admin | Create external location | ✅ |
 | PATCH | `/external-locations/:id` | Admin | Update external location | ✅ |
 

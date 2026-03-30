@@ -10,7 +10,7 @@
 - Venelin (lab manager / domain expert / co-developer)
 
 ## Last Updated
-2026-03-25
+2026-03-30
 
 ---
 
@@ -145,6 +145,8 @@ See `DECISIONS.md` for full log.
 - [x] **Audit trail on item create** — RECEIPT OperationRecord created atomically in `$transaction` for all 5 item types when location is supplied (BUG-005)
 - [x] **Move/Receipt validation** — Move requires at least one destination; Receipt requires at least one location (BUG-008, BUG-009)
 - [x] **Lab ID editable via API** — `labIdNumber` added to `UpdateItemBody` schema so PATCH persists changes (BUG-010)
+- [x] **Refresh token system** — `POST /auth/refresh` and `POST /auth/logout` implemented with DB-backed token rotation and revocation
+- [x] **Dev auth bypass** — `DEV_AUTH=true` (backend) + `VITE_DEV_AUTO_LOGIN=true` (frontend) env flags; auto-login on mount, LDAP skipped in dev (ADC-12)
 
 ---
 

@@ -25,7 +25,6 @@ function getItemDisplayName(item: AnyItem): string {
 }
 
 function getItemLocation(item: AnyItem): string {
-  // API response nests location objects; mock data has flat labels
   const asAny = item as Record<string, any>
   if (asAny.externalLocation?.name) return asAny.externalLocation.name
   if (asAny.externalLocationName) return asAny.externalLocationName
@@ -34,8 +33,16 @@ function getItemLocation(item: AnyItem): string {
   return ''
 }
 
-
 type SortField = 'labIdNumber' | 'itemType' | 'name' | 'status' | 'location' | 'updatedAt'
+
+const COLUMNS: { field: SortField; label: string; defaultWidth: number }[] = [
+  { field: 'labIdNumber',  label: 'Lab ID',             defaultWidth: 100 },
+  { field: 'itemType',     label: 'Type',               defaultWidth: 120 },
+  { field: 'name',         label: 'Name / Description', defaultWidth: 260 },
+  { field: 'status',       label: 'Status',             defaultWidth: 110 },
+  { field: 'location',     label: 'Location',           defaultWidth: 150 },
+  { field: 'updatedAt',    label: 'Updated',            defaultWidth: 100 },
+]
 
 export function ItemListPage() {
   const [items, setItems] = useState<AnyItem[]>(USE_MOCKS ? MOCK_ITEMS : [])
@@ -49,9 +56,36 @@ export function ItemListPage() {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [sortField, setSortField] = useState<SortField>('updatedAt')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [colWidths, setColWidths] = useState<number[]>(COLUMNS.map(c => c.defaultWidth))
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const resizeRef = useRef<{ col: number; startX: number; startWidth: number } | null>(null)
 
-  // Fetch from API
+  // Column resize: attach document listeners once
+  useEffect(() => {
+    function onMouseMove(e: MouseEvent) {
+      if (!resizeRef.current) return
+      const { col, startX, startWidth } = resizeRef.current
+      const newWidth = Math.max(60, startWidth + (e.clientX - startX))
+      setColWidths(prev => {
+        const next = [...prev]
+        next[col] = newWidth
+        return next
+      })
+    }
+    function onMouseUp() {
+      if (!resizeRef.current) return
+      resizeRef.current = null
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onMouseUp)
+    }
+  }, [])
+
   const fetchItems = useCallback(async () => {
     if (USE_MOCKS) return
     setLoading(true)
@@ -72,9 +106,7 @@ export function ItemListPage() {
     }
   }, [typeFilter, statusFilter, search])
 
-  useEffect(() => {
-    fetchItems()
-  }, [fetchItems])
+  useEffect(() => { fetchItems() }, [fetchItems])
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -87,7 +119,6 @@ export function ItemListPage() {
   }, [dropdownOpen])
 
   const filteredAndSorted = useMemo(() => {
-    // When using API, filtering is server-side, but we still filter scrapped client-side
     let data = items
     if (USE_MOCKS) {
       data = data.filter((item) => {
@@ -105,43 +136,20 @@ export function ItemListPage() {
         return true
       })
     } else {
-      if (!showScrapped) {
-        data = data.filter((item) => item.status !== ItemStatus.SCRAPPED)
-      }
+      if (!showScrapped) data = data.filter((item) => item.status !== ItemStatus.SCRAPPED)
     }
 
-    // Sort
     return [...data].sort((a, b) => {
       let valA: any = ''
       let valB: any = ''
-
       switch (sortField) {
-        case 'labIdNumber':
-          valA = a.labIdNumber
-          valB = b.labIdNumber
-          break
-        case 'itemType':
-          valA = ITEM_TYPE_LABELS[a.itemType]
-          valB = ITEM_TYPE_LABELS[b.itemType]
-          break
-        case 'name':
-          valA = getItemDisplayName(a).toLowerCase()
-          valB = getItemDisplayName(b).toLowerCase()
-          break
-        case 'status':
-          valA = a.status
-          valB = b.status
-          break
-        case 'location':
-          valA = getItemLocation(a).toLowerCase()
-          valB = getItemLocation(b).toLowerCase()
-          break
-        case 'updatedAt':
-          valA = new Date(a.updatedAt).getTime()
-          valB = new Date(b.updatedAt).getTime()
-          break
+        case 'labIdNumber': valA = a.labIdNumber; valB = b.labIdNumber; break
+        case 'itemType':    valA = ITEM_TYPE_LABELS[a.itemType]; valB = ITEM_TYPE_LABELS[b.itemType]; break
+        case 'name':        valA = getItemDisplayName(a).toLowerCase(); valB = getItemDisplayName(b).toLowerCase(); break
+        case 'status':      valA = a.status; valB = b.status; break
+        case 'location':    valA = getItemLocation(a).toLowerCase(); valB = getItemLocation(b).toLowerCase(); break
+        case 'updatedAt':   valA = new Date(a.updatedAt).getTime(); valB = new Date(b.updatedAt).getTime(); break
       }
-
       const order = sortOrder === 'asc' ? 1 : -1
       if (valA < valB) return -1 * order
       if (valA > valB) return 1 * order
@@ -158,50 +166,36 @@ export function ItemListPage() {
     }
   }
 
-  function SortIndicator({ field }: { field: SortField }) {
-    if (sortField !== field) return <ArrowUpDown size={12} className="opacity-30 group-hover:opacity-100 transition-opacity" />
-    return sortOrder === 'asc' ? <ArrowUp size={12} className="text-blue-600" /> : <ArrowDown size={12} className="text-blue-600" />
-  }
-
-  function Header({ field, label, className }: { field: SortField; label: string; className?: string }) {
-    return (
-      <th 
-        className={clsx(
-          "px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide cursor-pointer group hover:bg-slate-50 transition-colors select-none",
-          className
-        )}
-        onClick={() => handleSort(field)}
-      >
-        <div className="flex items-center gap-1.5">
-          {label}
-          <SortIndicator field={field} />
-        </div>
-      </th>
-    )
+  function startResize(e: React.MouseEvent, colIndex: number) {
+    e.preventDefault()
+    e.stopPropagation()
+    resizeRef.current = { col: colIndex, startX: e.clientX, startWidth: colWidths[colIndex] }
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2">
         <div className="flex-1 min-w-48 relative">
-          <ScanLine size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <ScanLine size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by Lab ID, name, location…"
-            className="w-full bg-white border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full bg-white border border-slate-200 rounded-lg pl-9 pr-3 py-1 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
 
         <div className="flex items-center gap-2">
-          <Filter size={14} className="text-slate-400" />
+          <Filter size={13} className="text-slate-400" />
           <div className="relative">
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value as ItemType | '')}
-              className="appearance-none bg-white border border-slate-200 rounded-lg pl-3 pr-7 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              className="appearance-none bg-white border border-slate-200 rounded-lg pl-3 pr-7 py-1 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
               <option value="">All Types</option>
               {Object.entries(ITEM_TYPE_LABELS).map(([v, l]) => (
@@ -219,7 +213,7 @@ export function ItemListPage() {
                 setStatusFilter(val)
                 if (val === ItemStatus.SCRAPPED) setShowScrapped(true)
               }}
-              className="appearance-none bg-white border border-slate-200 rounded-lg pl-3 pr-7 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              className="appearance-none bg-white border border-slate-200 rounded-lg pl-3 pr-7 py-1 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
               <option value="">All Statuses</option>
               <option value={ItemStatus.IN_STORAGE}>In Storage</option>
@@ -230,7 +224,7 @@ export function ItemListPage() {
             <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           </div>
 
-          <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
+          <label className="flex items-center gap-1.5 text-sm text-slate-600 cursor-pointer select-none">
             <input
               type="checkbox"
               checked={showScrapped}
@@ -247,7 +241,7 @@ export function ItemListPage() {
             onClick={() => setDropdownOpen(o => !o)}
             aria-haspopup="true"
             aria-expanded={dropdownOpen}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-3 py-1 rounded-lg transition-colors"
           >
             <Plus size={15} />
             Add Item
@@ -278,7 +272,7 @@ export function ItemListPage() {
 
       {/* Error banner */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-3 flex items-center gap-3 text-sm text-red-700">
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-2 flex items-center gap-3 text-sm text-red-700">
           <span>{error}</span>
           <button onClick={fetchItems} className="ml-auto text-red-600 hover:text-red-700 text-xs font-medium">Retry</button>
         </div>
@@ -287,28 +281,51 @@ export function ItemListPage() {
       {/* Table */}
       <Card>
         {loading ? (
-          <div className="flex items-center justify-center py-16 gap-2 text-slate-400">
+          <div className="flex items-center justify-center py-10 gap-2 text-slate-400">
             <Loader2 size={18} className="animate-spin" />
             <span className="text-sm">Loading items…</span>
           </div>
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="text-sm" style={{ tableLayout: 'fixed', width: colWidths.reduce((s, w) => s + w, 0) }}>
+                <colgroup>
+                  {colWidths.map((w, i) => <col key={i} style={{ width: w }} />)}
+                </colgroup>
                 <thead>
                   <tr className="border-b border-slate-100 text-left">
-                    <Header field="labIdNumber" label="Lab ID" />
-                    <Header field="itemType" label="Type" />
-                    <Header field="name" label="Name / Description" />
-                    <Header field="status" label="Status" />
-                    <Header field="location" label="Location" />
-                    <Header field="updatedAt" label="Updated" />
+                    {COLUMNS.map((col, i) => {
+                      const active = sortField === col.field
+                      return (
+                        <th
+                          key={col.field}
+                          className="relative px-3 py-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wide cursor-pointer group hover:bg-slate-50 transition-colors select-none overflow-hidden"
+                          onClick={() => handleSort(col.field)}
+                        >
+                          <div className="flex items-center gap-1.5 overflow-hidden">
+                            <span className="truncate">{col.label}</span>
+                            {active
+                              ? (sortOrder === 'asc' ? <ArrowUp size={12} className="shrink-0 text-blue-600" /> : <ArrowDown size={12} className="shrink-0 text-blue-600" />)
+                              : <ArrowUpDown size={12} className="shrink-0 opacity-30 group-hover:opacity-100 transition-opacity" />
+                            }
+                          </div>
+                          {/* Resize handle */}
+                          <div
+                            className="absolute right-0 top-0 h-full w-2 cursor-col-resize z-10 flex items-center justify-center group/handle"
+                            onMouseDown={(e) => startResize(e, i)}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div className="w-px h-4 bg-slate-200 group-hover/handle:bg-blue-400 transition-colors" />
+                          </div>
+                        </th>
+                      )
+                    })}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {filteredAndSorted.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="text-center py-12 text-slate-400">
+                      <td colSpan={6} className="text-center py-8 text-slate-400">
                         {error ? 'Failed to load items.' : 'No items match your search.'}
                       </td>
                     </tr>
@@ -324,7 +341,7 @@ export function ItemListPage() {
                             item.status === ItemStatus.SCRAPPED && 'opacity-60',
                           )}
                         >
-                          <td className="px-5 py-3.5">
+                          <td className="px-3 py-1 overflow-hidden whitespace-nowrap">
                             <Link
                               to={`/items/${item.id}`}
                               className="font-mono text-blue-600 hover:text-blue-700 font-medium text-xs"
@@ -332,19 +349,23 @@ export function ItemListPage() {
                               {item.labIdNumber}
                             </Link>
                           </td>
-                          <td className="px-5 py-3.5">
+                          <td className="px-3 py-1 overflow-hidden whitespace-nowrap">
                             <ItemTypeBadge type={item.itemType} />
                           </td>
-                          <td className="px-5 py-3.5 text-slate-700">{getItemDisplayName(item)}</td>
-                          <td className="px-5 py-3.5">
+                          <td className="px-3 py-1 overflow-hidden whitespace-nowrap text-slate-700">
+                            {getItemDisplayName(item)}
+                          </td>
+                          <td className="px-3 py-1 overflow-hidden whitespace-nowrap">
                             <ItemStatusBadge status={item.status} />
                           </td>
-                          <td className="px-5 py-3.5 text-slate-500 text-xs font-mono">
+                          <td className="px-3 py-1 overflow-hidden whitespace-nowrap text-slate-500 text-xs font-mono">
                             {isExternal
                               ? <span className="text-yellow-600">{location}</span>
                               : location || '—'}
                           </td>
-                          <td className="px-5 py-3.5 text-slate-400 text-xs">{formatDate(item.updatedAt)}</td>
+                          <td className="px-3 py-1 overflow-hidden whitespace-nowrap text-slate-400 text-xs">
+                            {formatDate(item.updatedAt)}
+                          </td>
                         </tr>
                       )
                     })
@@ -353,7 +374,7 @@ export function ItemListPage() {
               </table>
             </div>
 
-            <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <div className="px-4 py-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
               <span>Showing {filteredAndSorted.length} of {totalItems} items</span>
               <span className="text-slate-400">Scrapped items {showScrapped ? 'shown' : 'hidden'}</span>
             </div>
