@@ -9,7 +9,7 @@ import { Card, CardHeader } from '../../components/ui/Card'
 import { Badge } from '../../components/ui/Badge'
 import { MOCK_USERS, MOCK_SITES, MOCK_EXTERNAL_LOCATIONS } from '../../mock/data'
 import { UserRole, type Site, type User as AppUser } from '../../types'
-import { getSitesTree, createSite, createBuilding, createArea, createLocation, deleteLocation, deleteArea, deleteBuilding, getUsers, updateUser, deactivateUser, setUserPassword } from '../../api'
+import { getSitesTree, createSite, createBuilding, createArea, createLocation, deleteLocation, deleteArea, deleteBuilding, deleteSite, getUsers, createUser, updateUser, deactivateUser, setUserPassword, createExternalLocation } from '../../api'
 import clsx from 'clsx'
 
 const inputClass =
@@ -41,6 +41,47 @@ export function UserManagementPage() {
   const [saving, setSaving] = useState(false)
   const [actionError, setActionError] = useState('')
   const [colWidths, setColWidths] = useState([200, 100, 130, 90, 180])
+
+  // Invite User modal state
+  const [inviteOpen, setInviteOpen] = useState(false)
+  const [inviteLdap, setInviteLdap] = useState('')
+  const [inviteDisplay, setInviteDisplay] = useState('')
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState<UserRole>(UserRole.USER)
+  const [inviteSaving, setInviteSaving] = useState(false)
+  const [inviteError, setInviteError] = useState('')
+
+  function openInvite() {
+    setInviteLdap(''); setInviteDisplay(''); setInviteEmail('')
+    setInviteRole(UserRole.USER); setInviteError('')
+    setInviteOpen(true)
+  }
+
+  function closeInvite() { setInviteOpen(false) }
+
+  async function handleInviteUser() {
+    if (!inviteLdap.trim() || !inviteDisplay.trim() || !inviteEmail.trim()) {
+      setInviteError('LDAP username, display name, and email are required.')
+      return
+    }
+    setInviteError('')
+    setInviteSaving(true)
+    if (USE_MOCKS) {
+      await new Promise(r => setTimeout(r, 400))
+      setInviteSaving(false)
+      closeInvite()
+      return
+    }
+    try {
+      const res = await createUser({ ldapUsername: inviteLdap.trim(), displayName: inviteDisplay.trim(), email: inviteEmail.trim(), role: inviteRole })
+      setUsers(prev => [...prev, res.data])
+      closeInvite()
+    } catch (err) {
+      setInviteError(err instanceof Error ? err.message : 'Failed to create user')
+    } finally {
+      setInviteSaving(false)
+    }
+  }
 
   // Set Password modal state
   const [pwdUserId, setPwdUserId] = useState<string | null>(null)
@@ -147,7 +188,7 @@ export function UserManagementPage() {
   return (
     <div className="space-y-5 max-w-4xl">
       <div className="flex justify-end">
-        <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+        <button onClick={openInvite} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
           <Plus size={15} />
           Invite User
         </button>
@@ -264,6 +305,61 @@ export function UserManagementPage() {
         </div>
       </Card>
 
+      {/* Invite User Modal */}
+      {inviteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={closeInvite}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center">
+                  <Plus size={14} className="text-blue-700" />
+                </div>
+                <p className="text-sm font-semibold text-slate-800">Invite User</p>
+              </div>
+              <button onClick={closeInvite} className="p-1 text-slate-400 hover:text-slate-600 rounded transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">LDAP Username <span className="text-red-500">*</span></label>
+                <input autoFocus type="text" placeholder="john.doe" value={inviteLdap} onChange={e => setInviteLdap(e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">Display Name <span className="text-red-500">*</span></label>
+                <input type="text" placeholder="John Doe" value={inviteDisplay} onChange={e => setInviteDisplay(e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">Email <span className="text-red-500">*</span></label>
+                <input type="email" placeholder="john.doe@visteon.com" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">Role</label>
+                <select value={inviteRole} onChange={e => setInviteRole(e.target.value as UserRole)} className={inputClass}>
+                  <option value={UserRole.VIEWER}>Viewer</option>
+                  <option value={UserRole.USER}>User</option>
+                  <option value={UserRole.ADMIN}>Admin</option>
+                </select>
+              </div>
+              {inviteError && <p className="text-xs text-red-600">{inviteError}</p>}
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={handleInviteUser}
+                  disabled={inviteSaving || !inviteLdap || !inviteDisplay || !inviteEmail}
+                  className="flex-1 flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium py-2 rounded-lg transition-colors"
+                >
+                  {inviteSaving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                  {inviteSaving ? 'Creating…' : 'Create User'}
+                </button>
+                <button onClick={closeInvite} className="px-4 py-2 border border-slate-200 text-slate-600 text-sm rounded-lg hover:bg-slate-50 transition-colors">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Set Password Modal */}
       {pwdUserId && pwdUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={closePwdModal}>
@@ -373,16 +469,22 @@ export function LocationConfigPage() {
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
+  async function reloadSitesTree(): Promise<Site[]> {
+    const res = await getSitesTree()
+    const nextSites = res.data as Site[]
+    setSites(nextSites)
+    return nextSites
+  }
+
   // Load sites from backend on mount
   useEffect(() => {
     const load = async () => {
       try {
         setLoading(true)
         setError(null)
-        const res = await getSitesTree()
-        setSites(res.data as Site[])
-        if (res.data.length > 0) {
-          setExpandedSiteId(res.data[0].id)
+        const nextSites = await reloadSitesTree()
+        if (nextSites.length > 0) {
+          setExpandedSiteId(nextSites[0].id)
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load locations')
@@ -413,8 +515,8 @@ export function LocationConfigPage() {
 
   function saveEdit() {
     if (!editTarget || !editValue.trim()) return cancelEdit()
-    setEditTarget(null)
-    // Note: Edit functionality disabled until backend PUT endpoints are implemented
+    setError('Rename is not yet supported — backend PUT endpoints are not implemented.')
+    cancelEdit()
   }
 
   async function doAddSite() {
@@ -469,17 +571,14 @@ export function LocationConfigPage() {
     }
   }
 
-  async function doAddLocation(areaId: string, areaCode: string) {
+  async function doAddLocation(areaId: string) {
     if (!addRow.trim() || !addShelf.trim() || !addLevel.trim()) return
     const row = addRow.trim().padStart(2, '0')
     const shelf = addShelf.trim().padStart(2, '0')
     const level = addLevel.trim()
     try {
       setSavingAction('location')
-      console.log(`📍 Creating location in area ${areaId}: ${areaCode}-${row}-${shelf}-${level}`)
       const res = await createLocation(areaId, row, shelf, level)
-      console.log('✅ Location created successfully:', res)
-      console.log('🔄 Updating local state...')
       setSites(prev => prev.map(s => ({
         ...s,
         buildings: s.buildings.map(b => ({
@@ -490,13 +589,8 @@ export function LocationConfigPage() {
           ),
         })),
       })))
-      console.log('✅ Local state updated')
       cancelAdd()
     } catch (err) {
-      console.error('❌ Location creation failed:', {
-        error: err instanceof Error ? err.message : String(err),
-        fullError: err
-      })
       setError(err instanceof Error ? err.message : 'Failed to create location')
     } finally {
       setSavingAction(null)
@@ -508,16 +602,7 @@ export function LocationConfigPage() {
     setDeleteError(null)
     try {
       await deleteLocation(locationId)
-      setSites(prev => prev.map(s => ({
-        ...s,
-        buildings: s.buildings.map(b => ({
-          ...b,
-          storageAreas: b.storageAreas.map(a => ({
-            ...a,
-            locations: a.locations.filter(l => l.id !== locationId),
-          })),
-        })),
-      })))
+      await reloadSitesTree()
       setDeleteConfirm(null)
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : 'Failed to delete location')
@@ -531,13 +616,7 @@ export function LocationConfigPage() {
     setDeleteError(null)
     try {
       await deleteArea(areaId)
-      setSites(prev => prev.map(s => ({
-        ...s,
-        buildings: s.buildings.map(b => ({
-          ...b,
-          storageAreas: b.storageAreas.filter(a => a.id !== areaId),
-        })),
-      })))
+      await reloadSitesTree()
       if (expandedAreaId === areaId) setExpandedAreaId(null)
       setDeleteConfirm(null)
     } catch (err) {
@@ -552,10 +631,7 @@ export function LocationConfigPage() {
     setDeleteError(null)
     try {
       await deleteBuilding(buildingId)
-      setSites(prev => prev.map(s => ({
-        ...s,
-        buildings: s.buildings.filter(b => b.id !== buildingId),
-      })))
+      await reloadSitesTree()
       setDeleteConfirm(null)
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : 'Failed to delete building')
@@ -568,9 +644,8 @@ export function LocationConfigPage() {
     setDeleting(true)
     setDeleteError(null)
     try {
-      // TODO: Implement deleteSite API call when backend endpoint is added
-      // For now, just remove from UI
-      setSites(prev => prev.filter(s => s.id !== siteId))
+      await deleteSite(siteId)
+      await reloadSitesTree()
       if (expandedSiteId === siteId) setExpandedSiteId(null)
       setDeleteConfirm(null)
     } catch (err) {
@@ -990,7 +1065,7 @@ export function LocationConfigPage() {
                                   type="number" min={1} placeholder="1"
                                   value={addRow}
                                   onChange={e => setAddRow(e.target.value)}
-                                  onKeyDown={e => { if (e.key === 'Enter') doAddLocation(expandedArea.id, expandedArea.code); if (e.key === 'Escape') cancelAdd() }}
+                                  onKeyDown={e => { if (e.key === 'Enter') doAddLocation(expandedArea.id); if (e.key === 'Escape') cancelAdd() }}
                                   className="w-16 border border-slate-200 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
                                 />
                               </div>
@@ -1000,7 +1075,7 @@ export function LocationConfigPage() {
                                   type="number" min={1} placeholder="1"
                                   value={addShelf}
                                   onChange={e => setAddShelf(e.target.value)}
-                                  onKeyDown={e => { if (e.key === 'Enter') doAddLocation(expandedArea.id, expandedArea.code); if (e.key === 'Escape') cancelAdd() }}
+                                  onKeyDown={e => { if (e.key === 'Enter') doAddLocation(expandedArea.id); if (e.key === 'Escape') cancelAdd() }}
                                   className="w-16 border border-slate-200 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
                                 />
                               </div>
@@ -1010,7 +1085,7 @@ export function LocationConfigPage() {
                                   type="number" min={1} placeholder="1"
                                   value={addLevel}
                                   onChange={e => setAddLevel(e.target.value)}
-                                  onKeyDown={e => { if (e.key === 'Enter') doAddLocation(expandedArea.id, expandedArea.code); if (e.key === 'Escape') cancelAdd() }}
+                                  onKeyDown={e => { if (e.key === 'Enter') doAddLocation(expandedArea.id); if (e.key === 'Escape') cancelAdd() }}
                                   className="w-16 border border-slate-200 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
                                 />
                               </div>
@@ -1023,7 +1098,7 @@ export function LocationConfigPage() {
                               )}
                               <div className="flex gap-1 items-end ml-auto">
                                 <button
-                                  onClick={() => doAddLocation(expandedArea.id, expandedArea.code)}
+                                  onClick={() => doAddLocation(expandedArea.id)}
                                   className="flex items-center gap-1 px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs transition-colors"
                                 >
                                   <Save size={10} /> Add

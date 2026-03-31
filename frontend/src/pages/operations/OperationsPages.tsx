@@ -391,7 +391,9 @@ export function MovePage() {
       return
     }
     import('../../api').then(api => {
-      api.getItem(id).then(r => setSelectedItem(r.data)).catch(() => {})
+      api.getItem(id)
+        .then(r => setSelectedItem(r.data))
+        .catch(() => { setSelectedItemId(''); setError('Failed to load item details — please try again') })
     })
   }
 
@@ -499,7 +501,7 @@ export function MovePage() {
           </div>
 
           <div className="flex justify-end gap-3 pt-1">
-            <Link to="/" className="px-3 py-1.5 border border-slate-200 r || (!destLocationId && !destContainerId)ounded-lg text-sm text-slate-700 hover:bg-slate-50">Cancel</Link>
+            <button type="button" onClick={() => navigate(-1)} className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm text-slate-700 hover:bg-slate-50">Cancel</button>
             <button type="submit" disabled={submitting || !selectedItemId}
               className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-medium px-4 py-1.5 rounded-lg transition-colors">
               {submitting ? <><Loader2 size={14} className="animate-spin" /> Moving…</> : 'Confirm Move'}
@@ -583,7 +585,7 @@ export function ExitPage() {
             <textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} className={clsx(inputClass, 'resize-none')} placeholder="Purpose of exit, contact person…" />
           </div>
           <div className="flex justify-end gap-3 pt-1">
-            <Link to="/" className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm text-slate-700 hover:bg-slate-50">Cancel</Link>
+            <button type="button" onClick={() => navigate(-1)} className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm text-slate-700 hover:bg-slate-50">Cancel</button>
             <button type="submit" disabled={submitting || !selectedItemId || !externalLocationId}
               className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 disabled:opacity-60 text-white text-sm font-medium px-4 py-1.5 rounded-lg transition-colors">
               {submitting ? <><Loader2 size={14} className="animate-spin" /> Processing…</> : 'Confirm Exit'}
@@ -616,14 +618,17 @@ export function ReturnPage() {
       return
     }
     import('../../api').then(api => {
-      api.getItem(id).then(r => setSelectedItem(r.data)).catch(() => {})
+      api.getItem(id)
+        .then(r => setSelectedItem(r.data))
+        .catch(() => { setSelectedItemId(''); setError('Failed to load item details — please try again') })
     })
   }
 
+  const todayDate = new Date().toLocaleDateString('en-CA')
   const isOverdue =
     selectedItem?.status === ItemStatus.TEMP_EXIT &&
     selectedItem?.expectedReturnDate != null &&
-    new Date(selectedItem.expectedReturnDate) < new Date()
+    selectedItem.expectedReturnDate.slice(0, 10) < todayDate
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -708,9 +713,14 @@ export function ReturnPage() {
             </>
           )}
 
+          {selectedItem && !returnLocationId && (
+            <p className="text-xs text-red-600 flex items-center gap-1 mt-1">
+              <AlertTriangle size={11} />A return location must be selected before confirming.
+            </p>
+          )}
           <div className="flex justify-end gap-3 pt-1">
-            <Link to="/" className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm text-slate-700 hover:bg-slate-50">Cancel</Link>
-            <button type="submit" disabled={submitting || !selectedItem}
+            <button type="button" onClick={() => navigate(-1)} className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm text-slate-700 hover:bg-slate-50">Cancel</button>
+            <button type="submit" disabled={submitting || !selectedItem || !returnLocationId}
               className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white text-sm font-medium px-4 py-1.5 rounded-lg transition-colors">
               {submitting ? <><Loader2 size={14} className="animate-spin" /> Processing…</> : 'Confirm Return'}
             </button>
@@ -818,7 +828,7 @@ export function ScrapPage() {
           )}
 
           <div className="flex justify-end gap-3 pt-1">
-            <Link to="/" className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm text-slate-700 hover:bg-slate-50">Cancel</Link>
+            <button type="button" onClick={() => navigate(-1)} className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm text-slate-700 hover:bg-slate-50">Cancel</button>
             <button
               type="submit"
               disabled={!confirmed || !selectedItem || submitting}
@@ -953,7 +963,7 @@ export function ConsumePage() {
           </div>
 
           <div className="flex justify-end gap-3 pt-1">
-            <Link to="/" className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm text-slate-700 hover:bg-slate-50">Cancel</Link>
+            <button type="button" onClick={() => navigate(-1)} className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm text-slate-700 hover:bg-slate-50">Cancel</button>
             <button
               type="submit"
               disabled={!selectedItem || !qty || isNaN(qtyNum) || qtyNum <= 0 || qtyNum > (selectedItem?.quantity ?? 0) || submitting}

@@ -1,6 +1,6 @@
 // ─── Users API ────────────────────────────────────────────────────────────────
 
-import { apiGet, apiPatch, apiDelete } from './client'
+import { apiGet, apiPatch, apiPost, apiDelete } from './client'
 import type { User } from '../types'
 
 export type PasswordResponse = { success: true; data: null }
@@ -13,6 +13,18 @@ export interface UsersResponse {
 export interface UserResponse {
   success: true
   data: User
+}
+
+export interface CreateUserPayload {
+  ldapUsername: string
+  displayName: string
+  email: string
+  role: string
+  siteId?: string
+}
+
+export function createUser(data: CreateUserPayload): Promise<UserResponse> {
+  return apiPost<UserResponse>('/users', data)
 }
 
 export function getUsers(includeInactive = false): Promise<UsersResponse> {

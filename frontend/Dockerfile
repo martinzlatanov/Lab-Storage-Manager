@@ -13,6 +13,14 @@ COPY tailwind.config.js ./
 COPY index.html ./
 COPY src ./src
 
+# Build-time env vars for Vite (baked into the bundle at build time)
+ARG VITE_DEV_AUTO_LOGIN=false
+ARG VITE_DEV_USERNAME=admin
+ARG VITE_DEV_PASSWORD=admin
+ENV VITE_DEV_AUTO_LOGIN=$VITE_DEV_AUTO_LOGIN
+ENV VITE_DEV_USERNAME=$VITE_DEV_USERNAME
+ENV VITE_DEV_PASSWORD=$VITE_DEV_PASSWORD
+
 RUN npm run build
 
 # ── Stage 2: serve with nginx ─────────────────────────────────────────────────

@@ -44,6 +44,7 @@
 |---|---|---|---|---|
 | GET | `/sites` | All | List all sites (includes buildings) | ✅ |
 | POST | `/sites` | Admin | Create site | ✅ |
+| DELETE | `/sites/:id` | Admin | Delete site + child buildings/areas/locations — 409 if any IN_STORAGE items or containers exist within | ✅ |
 | GET | `/sites/tree` | All | Full hierarchy (sites→buildings→areas→locations) | ✅ |
 | GET | `/sites/:id/buildings` | All | List buildings in site (includes areas) | ✅ |
 | POST | `/sites/:id/buildings` | Admin | Create building | ✅ |

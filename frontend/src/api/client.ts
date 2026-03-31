@@ -68,13 +68,18 @@ export async function apiFetch<T>(
   options: RequestInit = {},
 ): Promise<T> {
   const doFetch = async (): Promise<Response> => {
+    const method = (options.method ?? 'GET').toUpperCase()
     const token = getAccessToken()
     const headers: Record<string, string> = {
       ...(options.body ? { 'Content-Type': 'application/json' } : {}),
       ...(options.headers as Record<string, string> ?? {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     }
-    return fetch(`${BASE_URL}${path}`, { ...options, headers })
+    return fetch(`${BASE_URL}${path}`, {
+      ...options,
+      headers,
+      cache: options.cache ?? (method === 'GET' ? 'no-store' : undefined),
+    })
   }
 
   let res = await doFetch()

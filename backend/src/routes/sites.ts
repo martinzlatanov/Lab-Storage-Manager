@@ -60,6 +60,68 @@ export default async function sitesRoutes(app: FastifyInstance) {
     }
   );
 
+  // DELETE /api/v1/sites/:siteId
+  app.delete(
+    "/sites/:siteId",
+    { preHandler: [app.authenticate, app.requireRole("ADMIN")] },
+    async (req, reply) => {
+      const { siteId } = req.params as { siteId: string };
+
+      const site = await prisma.site.findUnique({
+        where: { id: siteId },
+        include: {
+          buildings: {
+            include: {
+              storageAreas: {
+                include: { locations: { select: { id: true } } },
+              },
+            },
+          },
+        },
+      });
+      if (!site) {
+        return reply.status(404).send({ success: false, error: "Site not found" });
+      }
+
+      const locationIds = site.buildings.flatMap((b) =>
+        b.storageAreas.flatMap((a) => a.locations.map((l) => l.id))
+      );
+
+      if (locationIds.length > 0) {
+        const activeItemCount = await prisma.item.count({
+          where: { locationId: { in: locationIds }, status: "IN_STORAGE" },
+        });
+        if (activeItemCount > 0) {
+          return reply.status(409).send({
+            success: false,
+            error: `Cannot delete: ${activeItemCount} item${activeItemCount !== 1 ? "s" : ""} stored in this site`,
+          });
+        }
+
+        const containerCount = await prisma.container.count({
+          where: { locationId: { in: locationIds } },
+        });
+        if (containerCount > 0) {
+          return reply.status(409).send({
+            success: false,
+            error: `Cannot delete: ${containerCount} container${containerCount !== 1 ? "s" : ""} in this site`,
+          });
+        }
+
+        await prisma.storageLocation.deleteMany({ where: { id: { in: locationIds } } });
+      }
+
+      const buildingIds = site.buildings.map((b) => b.id);
+      if (buildingIds.length > 0) {
+        await prisma.storageArea.deleteMany({ where: { buildingId: { in: buildingIds } } });
+        await prisma.building.deleteMany({ where: { id: { in: buildingIds } } });
+      }
+
+      await prisma.site.delete({ where: { id: siteId } });
+      return reply.send({ success: true });
+    }
+  );
+
   // ── Buildings ─────────────────────────────────────────────────────────────
 
   // GET /api/v1/sites/:siteId/buildings
@@ -184,25 +246,16 @@ export default async function sitesRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const { areaId } = req.params as { areaId: string };
       const body = CreateLocationBody.safeParse(req.body);
-      
-      console.log(`📍 POST /areas/${areaId}/locations received`)
-      console.log('  Request body:', req.body)
-      console.log('  Parsed body:', body.data ?? body.error)
-      
+
       if (!body.success) {
-        console.error('  ❌ Validation failed:', body.error)
         return reply.status(400).send({ success: false, error: "Invalid request body" });
       }
-
-      console.log(`  ✅ Validation passed, user: ${req.user?.username}`)
 
       const area = await prisma.storageArea.findUnique({
         where: { id: areaId },
         include: { building: false },
       });
-      
-      console.log(`  Area lookup: ${area ? '✅ found' : '❌ not found'}`, { areaId })
-      
+
       if (!area) {
         return reply.status(404).send({ success: false, error: "Storage area not found" });
       }
@@ -217,15 +270,13 @@ export default async function sitesRoutes(app: FastifyInstance) {
           },
         },
       });
-      
+
       if (existing) {
-        console.log('  ⚠️  Location already exists')
         return reply.status(409).send({ success: false, error: "This location already exists" });
       }
 
       const label = `${area.code}-${body.data.row}-${body.data.shelf}-${body.data.level}`;
-      console.log(`  Creating new location: ${label}`)
-      
+
       const location = await prisma.storageLocation.create({
         data: {
           storageAreaId: areaId,
@@ -235,8 +286,7 @@ export default async function sitesRoutes(app: FastifyInstance) {
           label,
         },
       });
-      
-      console.log('  ✅ Location created in DB:', location)
+
       return reply.status(201).send({ success: true, data: location });
     }
   );
@@ -245,17 +295,12 @@ export default async function sitesRoutes(app: FastifyInstance) {
   app.get(
     "/locations",
     async (_req, reply) => {
-      console.log('📍 GET /locations called')
       const locations = await prisma.storageLocation.findMany({
         orderBy: { label: "asc" },
         include: {
           storageArea: { include: { building: { include: { site: true } } } },
         },
       });
-      console.log(`  Found ${locations.length} locations in DB`)
-      if (locations.length > 0) {
-        console.log('  First 3:', locations.slice(0, 3).map(l => `${l.label} (${l.storageArea.building.site.name}/${l.storageArea.building.name})`))
-      }
       const data = locations.map((loc) => ({
         id: loc.id,
         label: loc.label,

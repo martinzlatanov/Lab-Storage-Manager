@@ -1,0 +1,73 @@
+# ── Development compose — no LDAP, no credentials required ───────────────────
+# Usage: docker compose -f docker-compose.dev.yml up --build
+#
+# Auth is fully bypassed:
+#   - Backend: DEV_AUTH=true accepts any username/password, auto-creates ADMIN
+#   - Frontend: VITE_DEV_AUTO_LOGIN=true skips the login form entirely
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: lab-storage-db-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: lab_storage
+      POSTGRES_USER: lab_user
+      POSTGRES_PASSWORD: devpassword
+    volumes:
+      - lab_storage_dev_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lab_user -d lab_storage"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: lab-storage-backend-dev
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://lab_user:devpassword@postgres:5432/lab_storage
+      JWT_ACCESS_SECRET: dev_access_secret_minimum_32_characters_ok
+      JWT_REFRESH_SECRET: dev_refresh_secret_minimum_32_characters_ok
+      JWT_ACCESS_EXPIRES_IN: 24h
+      JWT_REFRESH_EXPIRES_IN: 30d
+      DEV_AUTH: "true"
+      NODE_ENV: development
+      PORT: 3001
+    ports:
+      - "3001:3001"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_DEV_AUTO_LOGIN: "true"
+        VITE_DEV_USERNAME: "admin"
+        VITE_DEV_PASSWORD: "admin"
+    container_name: lab-storage-frontend-dev
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: lab-storage-nginx-dev
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+
+volumes:
+  lab_storage_dev_data:

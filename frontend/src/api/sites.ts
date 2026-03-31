@@ -155,6 +155,10 @@ export function deleteBuilding(buildingId: string): Promise<{ success: true }> {
   return apiDelete(`/buildings/${buildingId}`)
 }
 
+export function deleteSite(siteId: string): Promise<{ success: true }> {
+  return apiDelete(`/sites/${siteId}`)
+}
+
 export interface LocationsFlatResponse {
   success: true
   data: Array<{ id: string; label: string; buildingName: string; siteName: string }>

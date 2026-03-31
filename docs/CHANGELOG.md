@@ -9,6 +9,32 @@
 ## [2026-03-31]
 
 ### Added
+- **`docker-compose.dev.yml`** — single-command dev stack with auth fully bypassed: `DEV_AUTH=true` on backend (skips LDAP, accepts any credentials, auto-creates ADMIN user), `VITE_DEV_AUTO_LOGIN=true` on frontend (skips login form entirely). Run with `docker compose -f docker-compose.dev.yml up --build`.
+- **Frontend Dockerfile** — added `ARG`/`ENV` support for `VITE_DEV_AUTO_LOGIN`, `VITE_DEV_USERNAME`, `VITE_DEV_PASSWORD` so Vite bakes them into the bundle at build time.
+
+### Fixed
+- **BUG-011 — Barcode uniqueness now fully enforced (Backend)**: Confirmed that all item creation endpoints require `barcode` as a non-optional field; a 409 conflict check at the application layer and `@unique` DB constraint together prevent duplicates. The silent fallback to `labIdNumber` does not exist in current code. Bug closed.
+- **Backend debug logs removed** (`backend/src/routes/sites.ts`): Removed 12 debug `console.log`/`console.error` statements left in `POST /areas/:areaId/locations` and `GET /locations` handlers — analogous to BUG-032 on the frontend side.
+
+### Added
+- **QA audit — 16 new defects logged** (`docs/BUGS.md`):
+  - BUG-023: Edit site/building/area saves nothing — `saveEdit()` is a no-op stub (AdminPages.tsx:420–424)
+  - BUG-024: Delete site only removes from UI state, never calls API (AdminPages.tsx:559–562)
+  - BUG-025: "Invite User" button has no onClick handler (AdminPages.tsx:149–153)
+  - BUG-026: External Location "Save" button is a stub — no API call made (AdminPages.tsx:1083–1124)
+  - BUG-027: All three System Settings save buttons (LDAP, Printer, Alerts) are stubs (AdminPages.tsx:1173/1211/1233)
+  - BUG-028: All four Export CSV/Export buttons in Reports have no onClick handler (ReportsPages.tsx)
+  - BUG-029: Corrupted HTML in Move page Cancel link — JS expression embedded in className (OperationsPages.tsx:502)
+  - BUG-030: Cancel buttons on operation pages redirect to `/` instead of going back
+  - BUG-031: Audit log search only filters loaded records client-side; does not query API
+  - BUG-032: 5 debug `console.log` statements left in `doAddLocation()` (AdminPages.tsx:485–499)
+  - BUG-033: Return operation allows submission without a return location selected
+  - BUG-034: Item fetch errors in operation search flow are silently swallowed (`.catch(() => {})`)
+  - BUG-035: Pagination total-page count calculated differently in mock vs. API mode
+  - BUG-036: Overdue detection uses timestamp comparison instead of calendar-date comparison
+  - BUG-037: Add Item form has no client-side required-field validation before API submission
+  - BUG-038: Add Item / Edit Item forms have no unsaved-changes warning on navigation
+
 - **Item list pagination** — `ItemListPage` now paginates at 50 items/page with Prev/Next controls and "Showing X–Y of Z items" footer.
   - `frontend/src/pages/items/ItemListPage.tsx`: added `page`/`totalPages` state, `PAGE_SIZE = 50` constant, `pagedItems` memo for mock-mode client-side slicing, `handleSearch`/`handleTypeFilter`/`handleStatusFilter` wrappers that reset page to 1 on filter change, and pagination footer with ChevronLeft/ChevronRight buttons.
   - Real API path passes `page` and `pageSize: 50` to `GET /items`; backend already supported `page`/`pageSize`/`totalPages` in its response meta.
@@ -28,6 +54,13 @@
 - **Delete location/area/building requests** — error "Body cannot be empty when content-type is set to 'application/json'".
   - `frontend/src/api/client.ts`: Fixed `apiFetch` function to only set `Content-Type: application/json` header when request has a body.
   - DELETE requests without body no longer send the `Content-Type` header, preventing middleware validation errors.
+- **Deleted locations reappearing after page refresh** — hierarchy could be repopulated from stale GET cache/local optimistic state.
+  - `frontend/src/api/client.ts`: `apiFetch` now forces `cache: 'no-store'` for GET requests by default, so location hierarchy always reloads from fresh backend state.
+  - `frontend/src/pages/admin/AdminPages.tsx`: `LocationConfigPage` now reloads the full `/sites/tree` from backend after deleting location/area/building, ensuring the UI matches persisted data immediately.
+- **Delete in Location Config not persisted for site-level entries** — site deletion was UI-only and always came back after refresh.
+  - `backend/src/routes/sites.ts`: Added `DELETE /sites/:siteId` with Admin auth, same safety checks as lower-level deletes (blocks on active `IN_STORAGE` items and containers), and cascading deletion of child locations/areas/buildings.
+  - `frontend/src/api/sites.ts` + `frontend/src/api/index.ts`: Added/exported `deleteSite` API function.
+  - `frontend/src/pages/admin/AdminPages.tsx`: `handleDeleteSite` now calls backend `deleteSite` and reloads hierarchy from `/sites/tree` instead of local-only state mutation.
 - **Delete building icon visibility** — trash icon was too light to see in LocationConfigPage.
   - `frontend/src/pages/admin/AdminPages.tsx`: Changed color of delete icon from `text-slate-300` to `text-slate-400` for better visibility.
 - **Move Item operation** — form was allowing submission without required destination, causing backend validation errors.
