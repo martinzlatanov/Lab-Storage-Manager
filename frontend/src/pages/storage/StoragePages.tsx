@@ -79,10 +79,10 @@ export function LocationBrowserPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* Admin-only location hierarchy management */}
       {user?.role === UserRole.ADMIN && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
           <p className="text-sm text-blue-900 mb-2">
             <span className="font-semibold">Admin:</span> Need to add or edit sites, buildings, or areas?
           </p>
@@ -144,7 +144,7 @@ export function LocationBrowserPage() {
                   key={site.id}
                   onClick={() => { setSelectedSiteId(site.id); setSelectedBuildingId(null); setSelectedAreaId(null); setSelectedLocationId(null) }}
                   className={clsx(
-                    'w-full flex items-center gap-3 px-4 py-3 text-left transition-colors',
+                    'w-full flex items-center gap-3 px-3 py-2 text-left transition-colors',
                     selectedSiteId === site.id ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-700',
                   )}
                 >
@@ -167,7 +167,7 @@ export function LocationBrowserPage() {
                     key={b.id}
                     onClick={() => { setSelectedBuildingId(b.id); setSelectedAreaId(null); setSelectedLocationId(null) }}
                     className={clsx(
-                      'w-full flex items-center gap-3 px-4 py-3 text-left transition-colors',
+                      'w-full flex items-center gap-3 px-3 py-2 text-left transition-colors',
                       selectedBuildingId === b.id ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-700',
                     )}
                   >
@@ -190,7 +190,7 @@ export function LocationBrowserPage() {
                     key={a.id}
                     onClick={() => { setSelectedAreaId(a.id); setSelectedLocationId(null) }}
                     className={clsx(
-                      'w-full flex items-center gap-3 px-4 py-3 text-left transition-colors',
+                      'w-full flex items-center gap-3 px-3 py-2 text-left transition-colors',
                       selectedAreaId === a.id ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-700',
                     )}
                   >
@@ -212,14 +212,14 @@ export function LocationBrowserPage() {
                 title={`Locations — Area ${selectedArea.code}`}
                 subtitle={`${selectedBuilding?.name} · ${selectedSite?.name}`}
               />
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3">
                 {selectedArea.locations.map(loc => {
                   const count = allItems.filter(i => i.locationId === loc.id).length
                   return (
                     <button
                       key={loc.id}
                       onClick={() => setSelectedLocationId(loc.id)}
-                      className="flex flex-col items-center gap-1 p-4 border border-slate-200 rounded-xl hover:bg-blue-50 hover:border-blue-200 transition-colors group"
+                      className="flex flex-col items-center gap-1 p-3 border border-slate-200 rounded-xl hover:bg-blue-50 hover:border-blue-200 transition-colors group"
                     >
                       <MapPin size={18} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
                       <span className="font-mono text-sm font-semibold text-slate-800">{loc.label}</span>
@@ -255,7 +255,7 @@ export function LocationBrowserPage() {
                       <Link
                         key={item.id}
                         to={`/items/${item.id}`}
-                        className="flex items-center gap-3 py-3 hover:bg-slate-50 rounded-lg px-2 transition-colors"
+                        className="flex items-center gap-3 py-2 hover:bg-slate-50 rounded-lg px-2 transition-colors"
                       >
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-mono font-medium text-blue-600">{item.labIdNumber}</p>
@@ -465,7 +465,7 @@ export function ContainerManagerPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {showAddModal && (
         <AddContainerModal
           onClose={() => setShowAddModal(false)}
@@ -491,14 +491,14 @@ export function ContainerManagerPage() {
           const locLabel = (container as any).location?.label ?? container.locationLabel ?? ''
 
           return (
-            <Card key={container.id} className="p-4">
+            <Card key={container.id} className="p-3">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-2.5">
                   <div className={clsx(
-                    'w-9 h-9 rounded-lg flex items-center justify-center',
+                    'w-8 h-8 rounded-lg flex items-center justify-center',
                     isExternal ? 'bg-yellow-100' : 'bg-blue-100',
                   )}>
-                    <Box size={18} className={isExternal ? 'text-yellow-600' : 'text-blue-600'} />
+                    <Box size={15} className={isExternal ? 'text-yellow-600' : 'text-blue-600'} />
                   </div>
                   <div>
                     <p className="font-mono text-sm font-bold text-slate-800">{container.label}</p>
@@ -592,7 +592,7 @@ export function ExternalLocationsPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
         {extLocs.map(ext => {
           const itemsHere = externalItems.filter(i => i.externalLocationId === ext.id)
@@ -602,7 +602,7 @@ export function ExternalLocationsPage() {
 
           return (
             <Card key={ext.id}>
-              <div className="p-4">
+              <div className="p-3">
                 <div className="flex items-start justify-between">
                   <div>
                     <div className="flex items-center gap-2">
@@ -649,7 +649,7 @@ export function ExternalLocationsPage() {
                 )}
               </div>
 
-              <div className="border-t border-slate-100 p-4">
+              <div className="border-t border-slate-100 p-3">
                 <p className="text-xs font-medium text-slate-500 mb-2">{itemsHere.length} item{itemsHere.length !== 1 ? 's' : ''} currently here</p>
                 {itemsHere.length === 0 ? (
                   <p className="text-xs text-slate-300 italic">No items at this location</p>

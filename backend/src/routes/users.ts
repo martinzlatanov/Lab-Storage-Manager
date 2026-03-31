@@ -1,6 +1,24 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { scrypt, randomBytes, timingSafeEqual } from "crypto";
+import { promisify } from "util";
 import { prisma } from "../lib/prisma.js";
+
+const scryptAsync = promisify(scrypt);
+
+async function hashPassword(password: string): Promise<string> {
+  const salt = randomBytes(16).toString("hex");
+  const hash = (await scryptAsync(password, salt, 64)) as Buffer;
+  return `${hash.toString("hex")}:${salt}`;
+}
+
+export async function verifyPassword(password: string, stored: string): Promise<boolean> {
+  const [hash, salt] = stored.split(":");
+  if (!hash || !salt) return false;
+  const hashBuffer = Buffer.from(hash, "hex");
+  const derivedBuffer = (await scryptAsync(password, salt, 64)) as Buffer;
+  return timingSafeEqual(hashBuffer, derivedBuffer);
+}
 
 // ─── Validation schemas ───────────────────────────────────────────────────────
 
@@ -18,6 +36,11 @@ const UpdateUserBody = z.object({
   role: z.enum(["ADMIN", "USER", "VIEWER"]).optional(),
   siteId: z.string().nullable().optional(),
   isActive: z.boolean().optional(),
+});
+
+const ChangePasswordBody = z.object({
+  newPassword: z.string().min(8).max(128),
+  currentPassword: z.string().optional(), // required for non-admins changing own password
 });
 
 // Fields safe to return — never expose raw password-adjacent data
@@ -215,6 +238,52 @@ export default async function usersRoutes(app: FastifyInstance) {
           data: { isActive: false },
         }),
       ]);
+
+      return reply.send({ success: true, data: null });
+    }
+  );
+
+  // PATCH /api/v1/users/:id/password
+  // Admin: can set any user's password (no current password required)
+  // Any authenticated user: can change own password (must supply currentPassword)
+  app.patch(
+    "/users/:id/password",
+    { preHandler: [app.authenticate] },
+    async (req, reply) => {
+      const { id } = req.params as { id: string };
+      const isAdmin = req.user.role === "ADMIN";
+      const isSelf = req.user.id === id;
+
+      if (!isAdmin && !isSelf) {
+        return reply.status(403).send({ success: false, error: "Forbidden" });
+      }
+
+      const body = ChangePasswordBody.safeParse(req.body);
+      if (!body.success) {
+        return reply.status(400).send({ success: false, error: "Invalid request body — newPassword must be 8–128 characters" });
+      }
+
+      const existing = await prisma.user.findUnique({ where: { id } });
+      if (!existing) {
+        return reply.status(404).send({ success: false, error: "User not found" });
+      }
+
+      // Non-admins must verify their current password before changing it
+      if (!isAdmin) {
+        if (!body.data.currentPassword) {
+          return reply.status(400).send({ success: false, error: "currentPassword is required" });
+        }
+        if (!existing.passwordHash) {
+          return reply.status(400).send({ success: false, error: "No local password set — contact an admin to set an initial password" });
+        }
+        const valid = await verifyPassword(body.data.currentPassword, existing.passwordHash);
+        if (!valid) {
+          return reply.status(400).send({ success: false, error: "Current password is incorrect" });
+        }
+      }
+
+      const passwordHash = await hashPassword(body.data.newPassword);
+      await prisma.user.update({ where: { id }, data: { passwordHash } });
 
       return reply.send({ success: true, data: null });
     }

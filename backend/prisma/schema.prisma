@@ -70,6 +70,10 @@ model User {
   role          UserRole @default(USER)
   isActive      Boolean  @default(true)
 
+  // Local password hash (nullable — LDAP users may not have a local password set)
+  // Format: scrypt-derived `hash:salt` (hex-encoded). Used as fallback when LDAP is unavailable.
+  passwordHash  String?
+
   // Optional home-site association (admins may be global)
   siteId        String?
   site          Site?    @relation(fields: [siteId], references: [id])

@@ -34,6 +34,7 @@
 | PATCH | `/users/:id` | Admin | Update user (role, site, active) | ✅ |
 | DELETE | `/users/:id` | Admin | Soft-deactivate user | ✅ |
 | GET | `/users/me` | All | Get current user profile | ✅ |
+| PATCH | `/users/:id/password` | All* | Set/change user password. Admin: any user, no current pwd needed. Others: own account only, `currentPassword` required. | ✅ |
 
 ---
 
@@ -52,6 +53,9 @@
 | POST | `/areas/:id/locations` | Admin | Create storage location | ✅ |
 | GET | `/locations` | PUBLIC | Flat list of all locations (for dropdowns; includes siteName, buildingName) | ✅ |
 | GET | `/locations/:id` | All | Get location detail + items + containers | ✅ |
+| DELETE | `/locations/:id` | Admin | Delete location — 409 if any IN_STORAGE items or containers present | ✅ |
+| DELETE | `/areas/:id` | Admin | Delete area + child locations — 409 if any IN_STORAGE items or containers exist within | ✅ |
+| DELETE | `/buildings/:id` | Admin | Delete building + child areas + locations — 409 if any IN_STORAGE items or containers exist within | ✅ |
 | GET | `/external-locations` | All | List external locations | ✅ |
 | GET | `/external-locations/:id` | All | Get external location detail + items in TEMP_EXIT | ✅ |
 | POST | `/external-locations` | Admin | Create external location | ✅ |

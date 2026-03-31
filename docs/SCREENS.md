@@ -17,7 +17,11 @@
 ```
 App
 ├── Auth
-│   └── Login (LDAP)
+│   └── Login (LDAP / local password fallback)
+├── Header (persistent)
+│   └── User Menu (avatar dropdown — all roles)
+│       ├── Change Password (modal)
+│       └── Sign Out
 ├── Dashboard (home)
 ├── Items
 │   ├── Item List / Search
@@ -63,8 +67,17 @@ App
 ### AUTH-01 — Login 🔲
 **Route:** `/login`
 **Access:** Public
-**Description:** LDAP credentials form. On success, issues JWT and redirects to Dashboard.
+**Description:** LDAP credentials form. On success, issues JWT and redirects to Dashboard. Falls back to local password if LDAP is unavailable.
 **Notes:** No local account creation. Error messages must not reveal LDAP structure.
+
+---
+
+### GLOBAL-01 — Header User Menu ✅
+**Route:** Persistent (all authenticated routes)
+**Access:** Admin, User, Viewer
+**Description:** Avatar button (top-right of header) showing display name + role. Opens a dropdown with:
+- **Change Password** — modal requiring current password + new password + confirm. Calls `PATCH /users/:id/password` with `currentPassword`. Requires admin to have set an initial local password first.
+- **Sign Out** — calls logout and redirects to `/login`.
 
 ---
 
@@ -252,10 +265,12 @@ App
 
 ---
 
-### ADMIN-01 — User Management 🔲
+### ADMIN-01 — User Management ✅
 **Route:** `/admin/users`
 **Access:** Admin only
 **Description:** List users, assign roles, deactivate. Cannot hard-delete.
+**Actions per row:** Edit role, Set Password (opens modal — new password + confirm, no current password required for admin), Deactivate.
+**Set Password modal:** Admin enters new password + confirm → calls `PATCH /users/:id/password`. Shows success state and auto-closes.
 
 ---
 

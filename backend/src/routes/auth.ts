@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { createSigner, createVerifier } from "fast-jwt";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
+import { verifyPassword } from "./users.js";
 import type { JwtPayload } from "../types/index.js";
 
 const LoginBody = z.object({
@@ -33,12 +34,19 @@ export default async function authRoutes(app: FastifyInstance) {
       let ldapUser;
       try {
         ldapUser = await ldapAuthenticate(username, password);
+        // Overwrite username with LDAP-resolved value
+        body.data.username = ldapUser.username;
       } catch (err) {
-        app.log.warn({ username }, "LDAP authentication failed");
-        return reply.status(401).send({ success: false, error: "Invalid credentials" });
+        // LDAP failed — try local password as fallback (for manually-created accounts)
+        const localUser = await prisma.user.findUnique({ where: { ldapUsername: username } });
+        if (localUser?.passwordHash && await verifyPassword(password, localUser.passwordHash)) {
+          app.log.info({ username }, "Authenticated via local password (LDAP unavailable)");
+          // Continue — user will be found/used below
+        } else {
+          app.log.warn({ username }, "LDAP authentication failed, no valid local password");
+          return reply.status(401).send({ success: false, error: "Invalid credentials" });
+        }
       }
-      // Overwrite username/password.data with LDAP-resolved values
-      body.data.username = ldapUser.username;
     }
 
     // 2. Find or create user in local DB

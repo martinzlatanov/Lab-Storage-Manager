@@ -164,7 +164,7 @@ export function ItemDetailPage() {
   const createdByName = getCreatedByName(item)
 
   return (
-    <div className="space-y-5 max-w-4xl">
+    <div className="space-y-3 max-w-4xl">
       {/* Back */}
       <Link to="/items" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 transition-colors">
         <ArrowLeft size={15} />
@@ -172,7 +172,7 @@ export function ItemDetailPage() {
       </Link>
 
       {/* Header card */}
-      <Card className="p-5">
+      <Card className="p-4">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -189,14 +189,14 @@ export function ItemDetailPage() {
             <div className="flex items-center gap-2 flex-wrap">
               <Link
                 to={`/items/${item.id}/edit`}
-                className="flex items-center gap-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm px-3 py-1.5 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm px-2.5 py-1 rounded-lg transition-colors"
               >
                 <Pencil size={14} />
                 Edit
               </Link>
               <Link
                 to={`/labels?item=${item.id}`}
-                className="flex items-center gap-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm px-3 py-1.5 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm px-2.5 py-1 rounded-lg transition-colors"
                 title="Print label for this item"
               >
                 <Printer size={14} />
@@ -205,7 +205,7 @@ export function ItemDetailPage() {
               <Link
                 to="/operations/move"
                 state={{ itemId: item.id }}
-                className="flex items-center gap-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm px-3 py-1.5 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm px-2.5 py-1 rounded-lg transition-colors"
               >
                 <ArrowRightLeft size={14} />
                 Move
@@ -214,7 +214,7 @@ export function ItemDetailPage() {
                 <Link
                   to="/operations/exit"
                   state={{ itemId: item.id }}
-                  className="flex items-center gap-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm px-3 py-1.5 rounded-lg transition-colors"
+                  className="flex items-center gap-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm px-2.5 py-1 rounded-lg transition-colors"
                 >
                   <ExternalLink size={14} />
                   Temp Exit
@@ -223,7 +223,7 @@ export function ItemDetailPage() {
               {item.itemType === ItemType.CONSUMABLE && (
                 <Link
                   to="/operations/consume"
-                  className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-sm px-3 py-1.5 rounded-lg transition-colors"
+                  className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-sm px-2.5 py-1 rounded-lg transition-colors"
                 >
                   <FlaskConical size={14} />
                   Consume
@@ -231,7 +231,7 @@ export function ItemDetailPage() {
               )}
               <Link
                 to="/operations/scrap"
-                className="flex items-center gap-1.5 border border-red-200 text-red-600 hover:bg-red-50 text-sm px-3 py-1.5 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 border border-red-200 text-red-600 hover:bg-red-50 text-sm px-2.5 py-1 rounded-lg transition-colors"
               >
                 <Trash2 size={14} />
                 Scrap
@@ -241,7 +241,7 @@ export function ItemDetailPage() {
         </div>
 
         {/* Location */}
-        <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-4 flex-wrap text-sm text-slate-600">
+        <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-4 flex-wrap text-sm text-slate-600">
           <div className="flex items-center gap-2">
             <MapPin size={14} className="text-slate-400" />
             {loc.isExternal ? (
@@ -267,11 +267,11 @@ export function ItemDetailPage() {
         </div>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Item attributes */}
         <Card>
           <CardHeader title="Item Details" />
-          <div className="p-5 grid grid-cols-2 gap-x-6 gap-y-4">
+          <div className="p-4 grid grid-cols-2 gap-x-4 gap-y-2.5">
             {item.itemType === ItemType.ELECTRONICS_SAMPLE && (() => {
               const el = item as ElectronicsSample
               return (
@@ -360,7 +360,7 @@ export function ItemDetailPage() {
               )
             })()}
 
-            <div className="col-span-2 border-t border-slate-100 pt-4 grid grid-cols-2 gap-4">
+            <div className="col-span-2 border-t border-slate-100 pt-3 grid grid-cols-2 gap-3">
               <div className="flex items-center gap-2">
                 <Calendar size={13} className="text-slate-400" />
                 <div>
@@ -385,11 +385,11 @@ export function ItemDetailPage() {
             title="Operation History"
             subtitle={`${itemOps.length} operation${itemOps.length !== 1 ? 's' : ''}`}
           />
-          <div className="p-5">
+          <div className="p-4">
             {itemOps.length === 0 ? (
               <p className="text-slate-400 text-sm text-center py-4">No operations recorded.</p>
             ) : (
-              <ol className="relative border-l border-slate-200 space-y-4 ml-2">
+              <ol className="relative border-l border-slate-200 space-y-3 ml-2">
                 {itemOps.map((op) => (
                   <li key={op.id} className="pl-5 relative">
                     <span className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-white border-2 border-blue-400" />

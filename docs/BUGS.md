@@ -24,3 +24,13 @@
 ## Resolved Issues
 
 All previously reported bugs (BUG-001 through BUG-020, excluding BUG-011) have been fixed. See [CHANGELOG.md](CHANGELOG.md) for details.
+
+### BUG-022 — Dev auto-login redirected to login page on JWT expiry *(Fixed 2026-03-31)*
+
+**Scope:** Frontend (`context/AuthContext.tsx`)
+**Fix:** The `auth:session-expired` handler now checks `DEV_AUTO_LOGIN` and re-calls `authApi.login()` instead of just clearing user state. The initial auto-login `useEffect` has empty deps so it only fires at mount — it would not re-run after expiry, leaving the user on the login screen in dev mode.
+
+### BUG-021 — Session expiry showed error in-page instead of redirecting to login *(Fixed 2026-03-31)*
+
+**Scope:** Frontend (`api/client.ts`, `context/AuthContext.tsx`)
+**Fix:** `client.ts` now dispatches `auth:session-expired` on `window` when token refresh fails. `AuthContext` listens and clears `user` state, triggering the `ProtectedRoute` redirect to `/login`.

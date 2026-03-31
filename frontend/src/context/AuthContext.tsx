@@ -43,6 +43,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [user])
 
+  // Clear auth state when the API client signals a session expiry (401 after refresh failure)
+  // In dev auto-login mode, re-login immediately instead of dropping to the login page.
+  useEffect(() => {
+    function handleExpired() {
+      if (DEV_AUTO_LOGIN) {
+        authApi.login(DEV_USERNAME, DEV_PASSWORD)
+          .then(setUser)
+          .catch(() => setUser(null))
+      } else {
+        setUser(null)
+      }
+    }
+    window.addEventListener('auth:session-expired', handleExpired)
+    return () => window.removeEventListener('auth:session-expired', handleExpired)
+  }, [])
+
   // Auto-login for development: runs once on mount if no existing session
   useEffect(() => {
     if (!DEV_AUTO_LOGIN || user) return

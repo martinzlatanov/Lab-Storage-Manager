@@ -10,7 +10,7 @@
 - Venelin (lab manager / domain expert / co-developer)
 
 ## Last Updated
-2026-03-30
+2026-03-31 (session 2)
 
 ---
 
@@ -147,6 +147,8 @@ See `DECISIONS.md` for full log.
 - [x] **Lab ID editable via API** — `labIdNumber` added to `UpdateItemBody` schema so PATCH persists changes (BUG-010)
 - [x] **Refresh token system** — `POST /auth/refresh` and `POST /auth/logout` implemented with DB-backed token rotation and revocation
 - [x] **Dev auth bypass** — `DEV_AUTH=true` (backend) + `VITE_DEV_AUTO_LOGIN=true` (frontend) env flags; auto-login on mount, LDAP skipped in dev (ADC-12)
+- [x] **Delete location / area / building** — Admin-only DELETE endpoints with occupancy guard (blocked if any IN_STORAGE items or containers exist); cascades to child nodes; UI inline confirmation in Admin → Location Config
+- [x] **Dev auto-login session recovery** — `auth:session-expired` handler re-auto-logs in when `VITE_DEV_AUTO_LOGIN=true`, preventing redirect to login page on token expiry during development
 
 ---
 

@@ -5,6 +5,69 @@
 
 ---
 
+## 2026-03-31 — Dev Auth Bypass – Active for Frontend Integration Phase
+
+**Decision:** Keep dev auth bypass enabled during frontend integration phase. This allows rapid development iteration without LDAP or manual login on every page reload.
+
+**Status:** ✅ ACTIVE IN DEVELOPMENT
+- **Backend:** `DEV_AUTH=true` in `.env` — auto-creates admin user, accepts any password
+- **Frontend:** `VITE_DEV_AUTO_LOGIN=true` in `.env` — skips login page, auto-logs in as `admin`/`admin`
+
+**When to disable:** Before any production deployment, remove both env flags.
+
+**Details:** See 2026-03-30 decision below for full architecture rationale.
+
+---
+
+## 2026-03-31 — Location / Area / Building Deletion Rules
+
+**Decision:** Allow hard deletion of storage locations, areas, and buildings — but only if no `IN_STORAGE` items or containers exist within them. Deletion cascades downward (building → areas → locations). Items, containers, and operation records that referenced the deleted location have their FK set to `NULL` (preserved via `ON DELETE SET NULL` already in the migration).
+
+**Problem:** Admins need to clean up the storage hierarchy (e.g. remove a decommissioned room or shelf) without being blocked by historical records that no longer represent physical reality.
+
+**Alternatives considered:**
+- Option A (chosen): Hard delete with occupancy guard — clean, irreversible, matches the physical world (a location that no longer exists shouldn't linger in the system)
+- Option B: Soft delete (`isActive: false`) — adds complexity to every location query; historical references would still be meaningful; unclear benefit
+- Option C: Block if any operation records reference the location — too restrictive; nearly every used location would become undeletable even after all items are removed
+
+**Rationale:**
+- `ON DELETE SET NULL` is already defined in the initial migration for `Item.locationId`, `Container.locationId`, and `OperationRecord.from/toLocationId` — no schema migration needed
+- SCRAPPED and DEPLETED items are not counted as "stored" — they are end-of-life records and don't block deletion
+- TEMP_EXIT items have `locationId = null` (cleared on exit) — they also don't block deletion
+- Operation records that lose their `locationId` reference still preserve all other fields (item, user, timestamp, type) — audit trail integrity is maintained
+- Inline UI confirmation ("Delete Area B?") with immediate backend error display prevents accidental deletes
+
+**Consequences / Trade-offs:**
+- Operation records referencing a deleted location will show `null` for from/to location — acceptable because the location no longer physically exists
+- Deletion is permanent and cannot be undone from the UI — admin should verify the location is truly empty before confirming
+
+---
+
+## 2026-03-31 — Local Password as LDAP Fallback
+
+**Decision:** Add an optional `passwordHash` field (scrypt, nullable) to the `User` model. During login, if LDAP throws an error, the backend tries the stored local password as a fallback. Admin can set any user's password via `PATCH /users/:id/password`; non-admins can change their own by supplying `currentPassword`.
+
+**Problem:** Manually-created accounts (`POST /users`) have no LDAP entry, so they can never log in when LDAP is the only auth path. Also needed a self-service "change my password" flow for all roles.
+
+**Alternatives considered:**
+- Option A (chosen): Nullable `passwordHash` on `User`, checked only when LDAP fails — zero cost for pure LDAP users, works for hybrid environments
+- Option B: Separate `/auth/local-login` endpoint — cleaner URL surface, but adds a permanent second login route that must be hidden or secured separately
+- Option C: Only support LDAP — blocks all manually-provisioned accounts from ever logging in
+
+**Rationale:**
+- Most users will always use LDAP; the fallback is silent and only triggers on LDAP failure
+- Keeps a single `POST /auth/login` endpoint — clients need no changes
+- `passwordHash` is nullable: existing users are completely unaffected until an admin sets a password
+- scrypt is built into Node.js `crypto` — no additional dependency needed
+- Aligns with the existing "manually-created users" path already in `POST /users`
+
+**Consequences / Trade-offs:**
+- Users with both an LDAP entry AND a local password always authenticate via LDAP first; local password is only a fallback
+- If an admin sets a local password for an LDAP user, it only takes effect when LDAP is unreachable (not a silent bypass)
+- Self-service password change requires that an admin has first set an initial local password
+
+---
+
 ## 2026-03-30 — Dev Auth Bypass Strategy
 
 **Decision:** Gate dev auth behind `DEV_AUTH=true` (backend) and `VITE_DEV_AUTO_LOGIN=true` (frontend) env flags. When enabled: backend skips LDAP and accepts any password; frontend silently auto-logs in on app mount as the configured dev user (default: `admin`/`admin`).

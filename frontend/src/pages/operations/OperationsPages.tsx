@@ -20,7 +20,7 @@ import clsx from 'clsx'
 const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true'
 
 const inputClass =
-  'w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition bg-white'
+  'w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition bg-white'
 
 // ── Shared types ─────────────────────────────────────────────────────────────
 
@@ -129,7 +129,7 @@ function getItemContainer(item: Record<string, unknown>): string {
 
 function StepHeader({ step, total, title }: { step: number; total: number; title: string }) {
   return (
-    <div className="flex items-center gap-3 mb-6">
+    <div className="flex items-center gap-3 mb-3">
       {Array.from({ length: total }, (_, i) => (
         <div key={i} className="flex items-center gap-1">
           <div
@@ -203,7 +203,7 @@ function ItemSearchBox({ onSelect }: { onSelect?: (id: string) => void }) {
               key={item.id}
               type="button"
               onClick={() => { setQuery(item.labIdNumber); setResults([]); onSelect?.(item.id) }}
-              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left border-b border-slate-50 last:border-0"
+              className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 transition-colors text-left border-b border-slate-50 last:border-0"
             >
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-mono font-medium text-slate-800">{item.labIdNumber}</p>
@@ -261,7 +261,7 @@ export function ReceiptPage() {
   }
 
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className="max-w-2xl space-y-3">
       <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
         <ArrowLeft size={15} /> Dashboard
       </Link>
@@ -272,7 +272,7 @@ export function ReceiptPage() {
 
       <Card>
         <CardHeader title="Receipt" subtitle="Register item(s) entering the warehouse" />
-        <div className="p-5">
+        <div className="p-4">
           <StepHeader
             step={step}
             total={3}
@@ -299,9 +299,9 @@ export function ReceiptPage() {
             )}
 
             {step === 2 && (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Location <span className="text-red-500">*</span></label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Location <span className="text-red-500">*</span></label>
                   {locationError && <p className="text-xs text-red-600 mb-1 flex items-center gap-1"><AlertTriangle size={11} />{locationError}</p>}
                   <select value={locationId} onChange={e => setLocationId(e.target.value)} className={inputClass}>
                     <option value="">— Select location —</option>
@@ -313,7 +313,7 @@ export function ReceiptPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Container (optional)</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Container (optional)</label>
                   <select value={containerId} onChange={e => setContainerId(e.target.value)} className={inputClass}>
                     <option value="">— No container / new box —</option>
                     {containerOptions.map(c => (
@@ -322,15 +322,15 @@ export function ReceiptPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Notes</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
                   <textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Received from supplier, delivery note #…" className={clsx(inputClass, 'resize-none')} />
                 </div>
               </div>
             )}
 
             {step === 3 && (
-              <div className="space-y-4">
-                <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+              <div className="space-y-3">
+                <div className="bg-green-50 border border-green-200 rounded-xl p-3">
                   <div className="flex items-center gap-2 mb-2">
                     <CheckCircle2 size={16} className="text-green-600" />
                     <p className="text-sm font-semibold text-green-800">Ready to confirm receipt</p>
@@ -344,15 +344,15 @@ export function ReceiptPage() {
               </div>
             )}
 
-            <div className="flex justify-between pt-2">
+            <div className="flex justify-between pt-1">
               {step > 1 ? (
                 <button type="button" onClick={() => setStep(s => s - 1)}
-                  className="px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                  className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm text-slate-700 hover:bg-slate-50 transition-colors">
                   Back
                 </button>
               ) : <div />}
               <button type="submit" disabled={submitting}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors">
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-medium px-4 py-1.5 rounded-lg transition-colors">
                 {submitting ? <><Loader2 size={14} className="animate-spin" /> Processing…</> : step < 3 ? 'Continue →' : 'Confirm Receipt'}
               </button>
             </div>
@@ -400,6 +400,13 @@ export function MovePage() {
     setSubmitting(true)
     setError('')
 
+    // Validate at least one destination is selected
+    if (!destLocationId && !destContainerId) {
+      setError('Please select at least one destination (location or container)')
+      setSubmitting(false)
+      return
+    }
+
     if (USE_MOCKS) {
       console.log('Move payload (mock):', { selectedItemId, destLocationId, destContainerId, notes })
       setTimeout(() => { setSubmitting(false); navigate('/items') }, 1000)
@@ -423,7 +430,7 @@ export function MovePage() {
   const asAny = selectedItem as Record<string, unknown> | null
 
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className="max-w-2xl space-y-3">
       <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
         <ArrowLeft size={15} /> Dashboard
       </Link>
@@ -434,11 +441,11 @@ export function MovePage() {
 
       <Card>
         <CardHeader title="Move Item" subtitle="Transfer item to a different location or container" />
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        <form onSubmit={handleSubmit} className="p-4 space-y-3">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Item <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Item <span className="text-red-500">*</span></label>
             {selectedItem && asAny ? (
-              <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+              <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="font-mono text-sm font-medium text-slate-800">{selectedItem.labIdNumber}</p>
@@ -463,10 +470,10 @@ export function MovePage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Destination Location <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Destination Location</label>
             {locationError && <p className="text-xs text-red-600 mb-1 flex items-center gap-1"><AlertTriangle size={11} />{locationError}</p>}
             <select value={destLocationId} onChange={e => setDestLocationId(e.target.value)} className={inputClass}>
-              <option value="">— Select destination —</option>
+              <option value="">— Select location —</option>
               {locationOptions.map(loc => (
                 <option key={loc.id} value={loc.id}>
                   {loc.label} ({loc.siteName} / {loc.buildingName})
@@ -476,24 +483,25 @@ export function MovePage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Destination Container (optional)</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Destination Container</label>
             <select value={destContainerId} onChange={e => setDestContainerId(e.target.value)} className={inputClass}>
-              <option value="">— No container —</option>
+              <option value="">— Select container —</option>
               {containerOptions.map(c => (
                 <option key={c.id} value={c.id}>{c.label}</option>
               ))}
             </select>
+            <p className="text-xs text-slate-500 mt-1">Select at least one destination (location or container)</p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Notes</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
             <textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} className={clsx(inputClass, 'resize-none')} placeholder="Reason for move…" />
           </div>
 
-          <div className="flex justify-end gap-3 pt-2">
-            <Link to="/" className="px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 hover:bg-slate-50">Cancel</Link>
+          <div className="flex justify-end gap-3 pt-1">
+            <Link to="/" className="px-3 py-1.5 border border-slate-200 r || (!destLocationId && !destContainerId)ounded-lg text-sm text-slate-700 hover:bg-slate-50">Cancel</Link>
             <button type="submit" disabled={submitting || !selectedItemId}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors">
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-medium px-4 py-1.5 rounded-lg transition-colors">
               {submitting ? <><Loader2 size={14} className="animate-spin" /> Moving…</> : 'Confirm Move'}
             </button>
           </div>
@@ -541,7 +549,7 @@ export function ExitPage() {
   }
 
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className="max-w-2xl space-y-3">
       <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
         <ArrowLeft size={15} /> Dashboard
       </Link>
@@ -552,13 +560,13 @@ export function ExitPage() {
 
       <Card>
         <CardHeader title="Temporary Exit" subtitle="Send item to an external location" />
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        <form onSubmit={handleSubmit} className="p-4 space-y-3">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Item <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Item <span className="text-red-500">*</span></label>
             <ItemSearchBox onSelect={setSelectedItemId} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">External Location <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">External Location <span className="text-red-500">*</span></label>
             <select value={externalLocationId} onChange={e => setExternalLocationId(e.target.value)} className={inputClass}>
               <option value="">— Select external location —</option>
               {externalOptions.map(el => (
@@ -567,17 +575,17 @@ export function ExitPage() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Expected Return Date <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Expected Return Date <span className="text-red-500">*</span></label>
             <input type="date" value={expectedReturnDate} onChange={e => setExpectedReturnDate(e.target.value)} className={inputClass} min={new Date().toISOString().split('T')[0]} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Notes</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
             <textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} className={clsx(inputClass, 'resize-none')} placeholder="Purpose of exit, contact person…" />
           </div>
-          <div className="flex justify-end gap-3 pt-2">
-            <Link to="/" className="px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 hover:bg-slate-50">Cancel</Link>
+          <div className="flex justify-end gap-3 pt-1">
+            <Link to="/" className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm text-slate-700 hover:bg-slate-50">Cancel</Link>
             <button type="submit" disabled={submitting || !selectedItemId || !externalLocationId}
-              className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 disabled:opacity-60 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors">
+              className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 disabled:opacity-60 text-white text-sm font-medium px-4 py-1.5 rounded-lg transition-colors">
               {submitting ? <><Loader2 size={14} className="animate-spin" /> Processing…</> : 'Confirm Exit'}
             </button>
           </div>
@@ -643,7 +651,7 @@ export function ReturnPage() {
   }
 
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className="max-w-2xl space-y-3">
       <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
         <ArrowLeft size={15} /> Dashboard
       </Link>
@@ -654,14 +662,14 @@ export function ReturnPage() {
 
       <Card>
         <CardHeader title="Return (Scan-in)" subtitle="Scan item back into storage" />
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        <form onSubmit={handleSubmit} className="p-4 space-y-3">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Scan Item <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Scan Item <span className="text-red-500">*</span></label>
             <ItemSearchBox onSelect={handleSelectItem} />
           </div>
 
           {selectedItem && isOverdue && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-3">
               <AlertTriangle size={16} className="text-red-500 mt-0.5 shrink-0" />
               <div>
                 <p className="text-sm font-semibold text-red-800">Overdue Return</p>
@@ -673,7 +681,7 @@ export function ReturnPage() {
           {selectedItem && (
             <>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Assign to Location <span className="text-red-500">*</span></label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Assign to Location <span className="text-red-500">*</span></label>
                 {locationError && <p className="text-xs text-red-600 mb-1 flex items-center gap-1"><AlertTriangle size={11} />{locationError}</p>}
                 <select value={returnLocationId} onChange={e => setReturnLocationId(e.target.value)} className={inputClass}>
                   <option value="">— Select storage location —</option>
@@ -685,7 +693,7 @@ export function ReturnPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Container (optional)</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Container (optional)</label>
                 <select value={returnContainerId} onChange={e => setReturnContainerId(e.target.value)} className={inputClass}>
                   <option value="">— No container —</option>
                   {containerOptions.map(c => (
@@ -694,16 +702,16 @@ export function ReturnPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Notes</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
                 <textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} className={clsx(inputClass, 'resize-none')} placeholder="Condition notes, delay reason…" />
               </div>
             </>
           )}
 
-          <div className="flex justify-end gap-3 pt-2">
-            <Link to="/" className="px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 hover:bg-slate-50">Cancel</Link>
+          <div className="flex justify-end gap-3 pt-1">
+            <Link to="/" className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm text-slate-700 hover:bg-slate-50">Cancel</Link>
             <button type="submit" disabled={submitting || !selectedItem}
-              className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors">
+              className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white text-sm font-medium px-4 py-1.5 rounded-lg transition-colors">
               {submitting ? <><Loader2 size={14} className="animate-spin" /> Processing…</> : 'Confirm Return'}
             </button>
           </div>
@@ -759,7 +767,7 @@ export function ScrapPage() {
   }
 
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className="max-w-2xl space-y-3">
       <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
         <ArrowLeft size={15} /> Dashboard
       </Link>
@@ -770,14 +778,14 @@ export function ScrapPage() {
 
       <Card>
         <CardHeader title="Scrap Item" subtitle="Mark item as permanently scrapped — cannot be undone" />
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        <form onSubmit={handleSubmit} className="p-4 space-y-3">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Item <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Item <span className="text-red-500">*</span></label>
             <ItemSearchBox onSelect={handleSelectItem} />
           </div>
 
           {selectedItem && asAny && (
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
               <div className="flex items-center gap-2 mb-2">
                 <ItemTypeBadge type={selectedItem.itemType} />
                 <ItemStatusBadge status={selectedItem.status} />
@@ -788,12 +796,12 @@ export function ScrapPage() {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Reason for Scrap <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Reason for Scrap <span className="text-red-500">*</span></label>
             <textarea rows={3} value={scrapReason} onChange={e => setScrapReason(e.target.value)} className={clsx(inputClass, 'resize-none')} placeholder="Describe the reason for scrapping (damage, EOL, failed test…)" />
           </div>
 
           {selectedItem && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3">
               <label className="flex items-start gap-3 cursor-pointer">
                 <input
                   type="checkbox"
@@ -809,8 +817,8 @@ export function ScrapPage() {
             </div>
           )}
 
-          <div className="flex justify-end gap-3 pt-2">
-            <Link to="/" className="px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 hover:bg-slate-50">Cancel</Link>
+          <div className="flex justify-end gap-3 pt-1">
+            <Link to="/" className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm text-slate-700 hover:bg-slate-50">Cancel</Link>
             <button
               type="submit"
               disabled={!confirmed || !selectedItem || submitting}
@@ -878,7 +886,7 @@ export function ConsumePage() {
   const newQty = selectedItem ? (selectedItem.quantity - (isNaN(qtyNum) ? 0 : qtyNum)) : null
 
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className="max-w-2xl space-y-3">
       <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
         <ArrowLeft size={15} /> Dashboard
       </Link>
@@ -889,9 +897,9 @@ export function ConsumePage() {
 
       <Card>
         <CardHeader title="Consume" subtitle="Record consumable usage and update quantity" />
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        <form onSubmit={handleSubmit} className="p-4 space-y-3">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Consumable <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Consumable <span className="text-red-500">*</span></label>
             <select className={inputClass} value={selectedItemId} onChange={e => setSelectedItemId(e.target.value)}>
               <option value="">— Select consumable —</option>
               {consumables.map(c => {
@@ -906,7 +914,7 @@ export function ConsumePage() {
           </div>
 
           {selectedItem && (
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
               <p className="text-xs text-slate-500">Current stock</p>
               <p className="text-2xl font-bold text-slate-900 mt-1">{selectedItem.quantity} <span className="text-base font-normal text-slate-500">{selectedItem.unit}</span></p>
             </div>
@@ -914,7 +922,7 @@ export function ConsumePage() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Quantity Consumed <span className="text-red-500">*</span></label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Quantity Consumed <span className="text-red-500">*</span></label>
               <input
                 type="number"
                 min="0.01"
@@ -928,7 +936,7 @@ export function ConsumePage() {
             </div>
             {selectedItem && qty && !isNaN(qtyNum) && (
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Remaining after</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Remaining after</label>
                 <div className={clsx(
                   'border rounded-lg px-3 py-2.5 text-sm font-semibold',
                   newQty !== null && newQty <= 0 ? 'bg-red-50 border-red-200 text-red-700' : 'bg-green-50 border-green-200 text-green-700'
@@ -940,12 +948,12 @@ export function ConsumePage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Notes</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
             <textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} className={clsx(inputClass, 'resize-none')} placeholder="Test batch number, usage purpose…" />
           </div>
 
-          <div className="flex justify-end gap-3 pt-2">
-            <Link to="/" className="px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 hover:bg-slate-50">Cancel</Link>
+          <div className="flex justify-end gap-3 pt-1">
+            <Link to="/" className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm text-slate-700 hover:bg-slate-50">Cancel</Link>
             <button
               type="submit"
               disabled={!selectedItem || !qty || isNaN(qtyNum) || qtyNum <= 0 || qtyNum > (selectedItem?.quantity ?? 0) || submitting}

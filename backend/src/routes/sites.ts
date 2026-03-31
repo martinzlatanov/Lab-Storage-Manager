@@ -294,6 +294,142 @@ export default async function sitesRoutes(app: FastifyInstance) {
     }
   );
 
+  // DELETE /api/v1/locations/:locationId
+  app.delete(
+    "/locations/:locationId",
+    { preHandler: [app.authenticate, app.requireRole("ADMIN")] },
+    async (req, reply) => {
+      const { locationId } = req.params as { locationId: string };
+
+      const location = await prisma.storageLocation.findUnique({
+        where: { id: locationId },
+      });
+      if (!location) {
+        return reply.status(404).send({ success: false, error: "Location not found" });
+      }
+
+      const activeItemCount = await prisma.item.count({
+        where: { locationId, status: "IN_STORAGE" },
+      });
+      if (activeItemCount > 0) {
+        return reply.status(409).send({
+          success: false,
+          error: `Cannot delete: ${activeItemCount} item${activeItemCount !== 1 ? "s" : ""} stored at this location`,
+        });
+      }
+
+      const containerCount = await prisma.container.count({
+        where: { locationId },
+      });
+      if (containerCount > 0) {
+        return reply.status(409).send({
+          success: false,
+          error: `Cannot delete: ${containerCount} container${containerCount !== 1 ? "s" : ""} at this location`,
+        });
+      }
+
+      await prisma.storageLocation.delete({ where: { id: locationId } });
+      return reply.send({ success: true });
+    }
+  );
+
+  // DELETE /api/v1/areas/:areaId
+  app.delete(
+    "/areas/:areaId",
+    { preHandler: [app.authenticate, app.requireRole("ADMIN")] },
+    async (req, reply) => {
+      const { areaId } = req.params as { areaId: string };
+
+      const area = await prisma.storageArea.findUnique({
+        where: { id: areaId },
+        include: { locations: { select: { id: true } } },
+      });
+      if (!area) {
+        return reply.status(404).send({ success: false, error: "Storage area not found" });
+      }
+
+      const locationIds = area.locations.map((l) => l.id);
+
+      if (locationIds.length > 0) {
+        const activeItemCount = await prisma.item.count({
+          where: { locationId: { in: locationIds }, status: "IN_STORAGE" },
+        });
+        if (activeItemCount > 0) {
+          return reply.status(409).send({
+            success: false,
+            error: `Cannot delete: ${activeItemCount} item${activeItemCount !== 1 ? "s" : ""} stored in this area`,
+          });
+        }
+
+        const containerCount = await prisma.container.count({
+          where: { locationId: { in: locationIds } },
+        });
+        if (containerCount > 0) {
+          return reply.status(409).send({
+            success: false,
+            error: `Cannot delete: ${containerCount} container${containerCount !== 1 ? "s" : ""} in this area`,
+          });
+        }
+
+        await prisma.storageLocation.deleteMany({ where: { storageAreaId: areaId } });
+      }
+
+      await prisma.storageArea.delete({ where: { id: areaId } });
+      return reply.send({ success: true });
+    }
+  );
+
+  // DELETE /api/v1/buildings/:buildingId
+  app.delete(
+    "/buildings/:buildingId",
+    { preHandler: [app.authenticate, app.requireRole("ADMIN")] },
+    async (req, reply) => {
+      const { buildingId } = req.params as { buildingId: string };
+
+      const building = await prisma.building.findUnique({
+        where: { id: buildingId },
+        include: {
+          storageAreas: {
+            include: { locations: { select: { id: true } } },
+          },
+        },
+      });
+      if (!building) {
+        return reply.status(404).send({ success: false, error: "Building not found" });
+      }
+
+      const locationIds = building.storageAreas.flatMap((a) => a.locations.map((l) => l.id));
+
+      if (locationIds.length > 0) {
+        const activeItemCount = await prisma.item.count({
+          where: { locationId: { in: locationIds }, status: "IN_STORAGE" },
+        });
+        if (activeItemCount > 0) {
+          return reply.status(409).send({
+            success: false,
+            error: `Cannot delete: ${activeItemCount} item${activeItemCount !== 1 ? "s" : ""} stored in this building`,
+          });
+        }
+
+        const containerCount = await prisma.container.count({
+          where: { locationId: { in: locationIds } },
+        });
+        if (containerCount > 0) {
+          return reply.status(409).send({
+            success: false,
+            error: `Cannot delete: ${containerCount} container${containerCount !== 1 ? "s" : ""} in this building`,
+          });
+        }
+
+        await prisma.storageLocation.deleteMany({ where: { id: { in: locationIds } } });
+      }
+
+      await prisma.storageArea.deleteMany({ where: { buildingId } });
+      await prisma.building.delete({ where: { id: buildingId } });
+      return reply.send({ success: true });
+    }
+  );
+
   // GET /api/v1/locations/:locationId
   app.get(
     "/locations/:locationId",
