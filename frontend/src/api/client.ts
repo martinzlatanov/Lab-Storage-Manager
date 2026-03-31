@@ -70,7 +70,7 @@ export async function apiFetch<T>(
   const doFetch = async (): Promise<Response> => {
     const token = getAccessToken()
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
       ...(options.headers as Record<string, string> ?? {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     }
@@ -86,6 +86,7 @@ export async function apiFetch<T>(
       res = await doFetch()
     } else {
       clearTokens()
+      window.dispatchEvent(new Event('auth:session-expired'))
       throw new ApiError('Session expired', 401)
     }
   }

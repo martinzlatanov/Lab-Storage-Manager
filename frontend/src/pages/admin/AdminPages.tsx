@@ -4,12 +4,12 @@
  */
 
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Shield, User, Eye, CheckCircle2, XCircle, Pencil, Save, X, ChevronRight, AlertCircle, Loader2 } from 'lucide-react'
+import { Plus, Shield, User, Eye, CheckCircle2, XCircle, Pencil, Save, X, ChevronRight, AlertCircle, Loader2, Trash2, KeyRound } from 'lucide-react'
 import { Card, CardHeader } from '../../components/ui/Card'
 import { Badge } from '../../components/ui/Badge'
 import { MOCK_USERS, MOCK_SITES, MOCK_EXTERNAL_LOCATIONS } from '../../mock/data'
 import { UserRole, type Site, type User as AppUser } from '../../types'
-import { getSitesTree, createSite, createBuilding, createArea, createLocation, getUsers, updateUser, deactivateUser } from '../../api'
+import { getSitesTree, createSite, createBuilding, createArea, createLocation, deleteLocation, deleteArea, deleteBuilding, getUsers, updateUser, deactivateUser, setUserPassword } from '../../api'
 import clsx from 'clsx'
 
 const inputClass =
@@ -40,7 +40,58 @@ export function UserManagementPage() {
   const [editingRole, setEditingRole] = useState<UserRole>(UserRole.USER)
   const [saving, setSaving] = useState(false)
   const [actionError, setActionError] = useState('')
-  const [colWidths, setColWidths] = useState([200, 100, 130, 90, 160])
+  const [colWidths, setColWidths] = useState([200, 100, 130, 90, 180])
+
+  // Set Password modal state
+  const [pwdUserId, setPwdUserId] = useState<string | null>(null)
+  const [pwdUser, setPwdUser] = useState<AppUser | null>(null)
+  const [pwdNew, setPwdNew] = useState('')
+  const [pwdConfirm, setPwdConfirm] = useState('')
+  const [pwdSaving, setPwdSaving] = useState(false)
+  const [pwdError, setPwdError] = useState('')
+  const [pwdSuccess, setPwdSuccess] = useState(false)
+
+  function openPwdModal(user: AppUser) {
+    setPwdUserId(user.id)
+    setPwdUser(user)
+    setPwdNew('')
+    setPwdConfirm('')
+    setPwdError('')
+    setPwdSuccess(false)
+  }
+
+  function closePwdModal() {
+    setPwdUserId(null)
+    setPwdUser(null)
+    setPwdNew('')
+    setPwdConfirm('')
+    setPwdError('')
+    setPwdSuccess(false)
+  }
+
+  async function handleSetPassword() {
+    if (!pwdUserId) return
+    if (pwdNew.length < 8) { setPwdError('Password must be at least 8 characters'); return }
+    if (pwdNew !== pwdConfirm) { setPwdError('Passwords do not match'); return }
+    setPwdError('')
+    setPwdSaving(true)
+    if (USE_MOCKS) {
+      await new Promise(r => setTimeout(r, 400))
+      setPwdSuccess(true)
+      setPwdSaving(false)
+      setTimeout(closePwdModal, 1200)
+      return
+    }
+    try {
+      await setUserPassword(pwdUserId, pwdNew)
+      setPwdSuccess(true)
+      setTimeout(closePwdModal, 1200)
+    } catch (err) {
+      setPwdError(err instanceof Error ? err.message : 'Failed to set password')
+    } finally {
+      setPwdSaving(false)
+    }
+  }
   const resizeRef = useRef<{ col: number; startX: number; startWidth: number } | null>(null)
   useEffect(() => {
     function onMouseMove(e: MouseEvent) {
@@ -187,6 +238,13 @@ export function UserManagementPage() {
                           >
                             <Pencil size={10} /> Edit
                           </button>
+                          <button
+                            onClick={() => openPwdModal(user)}
+                            className="flex items-center gap-1 px-2 py-0.5 border border-slate-200 text-slate-500 rounded text-xs hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200 transition-colors"
+                            title="Set password"
+                          >
+                            <KeyRound size={10} /> Pwd
+                          </button>
                           {user.isActive && (
                             <button
                               onClick={() => handleDeactivate(user.id)}
@@ -205,6 +263,77 @@ export function UserManagementPage() {
           </table>
         </div>
       </Card>
+
+      {/* Set Password Modal */}
+      {pwdUserId && pwdUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={closePwdModal}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-amber-100 border border-amber-200 flex items-center justify-center">
+                  <KeyRound size={14} className="text-amber-700" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">Set Password</p>
+                  <p className="text-xs text-slate-500">{pwdUser.displayName}</p>
+                </div>
+              </div>
+              <button onClick={closePwdModal} className="p-1 text-slate-400 hover:text-slate-600 rounded transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+
+            {pwdSuccess ? (
+              <div className="flex items-center gap-2 py-4 text-green-700 text-sm">
+                <CheckCircle2 size={16} />
+                Password set successfully
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">New Password</label>
+                  <input
+                    autoFocus
+                    type="password"
+                    placeholder="Min. 8 characters"
+                    value={pwdNew}
+                    onChange={e => setPwdNew(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleSetPassword()}
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">Confirm Password</label>
+                  <input
+                    type="password"
+                    placeholder="Repeat password"
+                    value={pwdConfirm}
+                    onChange={e => setPwdConfirm(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleSetPassword()}
+                    className={inputClass}
+                  />
+                </div>
+                {pwdError && (
+                  <p className="text-xs text-red-600">{pwdError}</p>
+                )}
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={handleSetPassword}
+                    disabled={pwdSaving || !pwdNew || !pwdConfirm}
+                    className="flex-1 flex items-center justify-center gap-1.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-sm font-medium py-2 rounded-lg transition-colors"
+                  >
+                    {pwdSaving ? <Loader2 size={14} className="animate-spin" /> : <KeyRound size={14} />}
+                    {pwdSaving ? 'Saving…' : 'Set Password'}
+                  </button>
+                  <button onClick={closePwdModal} className="px-4 py-2 border border-slate-200 text-slate-600 text-sm rounded-lg hover:bg-slate-50 transition-colors">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -239,6 +368,10 @@ export function LocationConfigPage() {
   const [addRow, setAddRow] = useState('')
   const [addShelf, setAddShelf] = useState('')
   const [addLevel, setAddLevel] = useState('')
+
+  const [deleteConfirm, setDeleteConfirm] = useState<{ kind: 'site' | 'location' | 'area' | 'building'; id: string } | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   // Load sites from backend on mount
   useEffect(() => {
@@ -370,6 +503,95 @@ export function LocationConfigPage() {
     }
   }
 
+  async function handleDeleteLocation(locationId: string) {
+    setDeleting(true)
+    setDeleteError(null)
+    try {
+      await deleteLocation(locationId)
+      setSites(prev => prev.map(s => ({
+        ...s,
+        buildings: s.buildings.map(b => ({
+          ...b,
+          storageAreas: b.storageAreas.map(a => ({
+            ...a,
+            locations: a.locations.filter(l => l.id !== locationId),
+          })),
+        })),
+      })))
+      setDeleteConfirm(null)
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Failed to delete location')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  async function handleDeleteArea(areaId: string) {
+    setDeleting(true)
+    setDeleteError(null)
+    try {
+      await deleteArea(areaId)
+      setSites(prev => prev.map(s => ({
+        ...s,
+        buildings: s.buildings.map(b => ({
+          ...b,
+          storageAreas: b.storageAreas.filter(a => a.id !== areaId),
+        })),
+      })))
+      if (expandedAreaId === areaId) setExpandedAreaId(null)
+      setDeleteConfirm(null)
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Failed to delete area')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  async function handleDeleteBuilding(buildingId: string) {
+    setDeleting(true)
+    setDeleteError(null)
+    try {
+      await deleteBuilding(buildingId)
+      setSites(prev => prev.map(s => ({
+        ...s,
+        buildings: s.buildings.filter(b => b.id !== buildingId),
+      })))
+      setDeleteConfirm(null)
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Failed to delete building')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  async function handleDeleteSite(siteId: string) {
+    setDeleting(true)
+    setDeleteError(null)
+    try {
+      // TODO: Implement deleteSite API call when backend endpoint is added
+      // For now, just remove from UI
+      setSites(prev => prev.filter(s => s.id !== siteId))
+      if (expandedSiteId === siteId) setExpandedSiteId(null)
+      setDeleteConfirm(null)
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Failed to delete site')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  function confirmDelete(kind: 'site' | 'location' | 'area' | 'building', id: string) {
+    setDeleteConfirm({ kind, id })
+    setDeleteError(null)
+    setAddTarget(null)
+    setEditTarget(null)
+  }
+
+  function cancelDelete() {
+    setDeleteConfirm(null)
+    setDeleteError(null)
+  }
+
   const isEditing = (kind: EditTarget['kind'], id: string) =>
     editTarget?.kind === kind && editTarget.id === id
 
@@ -487,6 +709,24 @@ export function LocationConfigPage() {
                     <X size={13} />
                   </button>
                 </>
+              ) : deleteConfirm?.kind === 'site' && deleteConfirm.id === site.id ? (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-red-600 font-medium">Delete {site.name}?</span>
+                  <button
+                    onClick={() => handleDeleteSite(site.id)}
+                    disabled={deleting}
+                    className="flex items-center gap-1 px-2 py-0.5 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white rounded text-xs transition-colors"
+                  >
+                    {deleting ? <Loader2 size={10} className="animate-spin" /> : null}
+                    Delete
+                  </button>
+                  <button onClick={cancelDelete} disabled={deleting} className="px-2 py-0.5 border border-slate-200 text-slate-600 rounded text-xs hover:bg-slate-50 transition-colors">
+                    Cancel
+                  </button>
+                  {deleteError && deleteConfirm.id === site.id && (
+                    <span className="text-xs text-red-600 max-w-xs">{deleteError}</span>
+                  )}
+                </div>
               ) : (
                 <>
                   <button
@@ -494,6 +734,13 @@ export function LocationConfigPage() {
                     className="p-1.5 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
                   >
                     <Pencil size={13} />
+                  </button>
+                  <button
+                    onClick={() => confirmDelete('site', site.id)}
+                    className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors"
+                    title="Delete site"
+                  >
+                    <Trash2 size={13} />
                   </button>
                   <button
                     onClick={() => { openAdd({ kind: 'building', siteId: site.id }); setExpandedSiteId(site.id) }}
@@ -539,15 +786,44 @@ export function LocationConfigPage() {
                       ) : (
                         <div className="flex items-center gap-1.5">
                           <p className="text-sm font-medium text-slate-700">{bldg.name}</p>
-                          <button
-                            onClick={() => openEdit({ kind: 'building', id: bldg.id }, bldg.name)}
-                            className="p-1 text-slate-300 hover:text-blue-600 rounded transition-colors"
-                          >
-                            <Pencil size={11} />
-                          </button>
+                          {deleteConfirm?.kind === 'building' && deleteConfirm.id === bldg.id ? (
+                            <div className="flex items-center gap-1.5 ml-1">
+                              <span className="text-xs text-red-600 font-medium">Delete building?</span>
+                              <button
+                                onClick={() => handleDeleteBuilding(bldg.id)}
+                                disabled={deleting}
+                                className="flex items-center gap-1 px-2 py-0.5 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white rounded text-xs transition-colors"
+                              >
+                                {deleting ? <Loader2 size={10} className="animate-spin" /> : null}
+                                Delete
+                              </button>
+                              <button onClick={cancelDelete} disabled={deleting} className="px-2 py-0.5 border border-slate-200 text-slate-600 rounded text-xs hover:bg-slate-50 transition-colors">
+                                Cancel
+                              </button>
+                              {deleteError && deleteConfirm.id === bldg.id && (
+                                <span className="text-xs text-red-600 max-w-xs">{deleteError}</span>
+                              )}
+                            </div>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => openEdit({ kind: 'building', id: bldg.id }, bldg.name)}
+                                className="p-1 text-slate-400 hover:text-blue-600 rounded transition-colors"
+                              >
+                                <Pencil size={11} />
+                              </button>
+                              <button
+                                onClick={() => confirmDelete('building', bldg.id)}
+                                className="p-1 text-slate-400 hover:text-red-500 rounded transition-colors"
+                                title="Delete building"
+                              >
+                                <Trash2 size={11} />
+                              </button>
+                            </>
+                          )}
                         </div>
                       )}
-                      {!isEditing('building', bldg.id) && (
+                      {!isEditing('building', bldg.id) && deleteConfirm?.id !== bldg.id && (
                         <button
                           onClick={() => openAdd({ kind: 'area', buildingId: bldg.id })}
                           className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors"
@@ -574,6 +850,24 @@ export function LocationConfigPage() {
                             <button onClick={saveEdit} className="text-blue-600 hover:text-blue-700"><Save size={11} /></button>
                             <button onClick={cancelEdit} className="text-slate-400 hover:text-red-500"><X size={11} /></button>
                           </div>
+                        ) : deleteConfirm?.kind === 'area' && deleteConfirm.id === area.id ? (
+                          <div key={area.id} className="flex items-center gap-1.5 bg-red-50 border border-red-200 rounded-lg px-3 py-1.5">
+                            <span className="text-xs text-red-600 font-medium">Delete Area {area.code}?</span>
+                            <button
+                              onClick={() => handleDeleteArea(area.id)}
+                              disabled={deleting}
+                              className="flex items-center gap-1 px-2 py-0.5 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white rounded text-xs transition-colors"
+                            >
+                              {deleting ? <Loader2 size={10} className="animate-spin" /> : null}
+                              Delete
+                            </button>
+                            <button onClick={cancelDelete} disabled={deleting} className="px-2 py-0.5 border border-slate-200 text-slate-600 rounded text-xs hover:bg-slate-50 transition-colors">
+                              Cancel
+                            </button>
+                            {deleteError && deleteConfirm.id === area.id && (
+                              <span className="text-xs text-red-600 max-w-xs">{deleteError}</span>
+                            )}
+                          </div>
                         ) : (
                           <div
                             key={area.id}
@@ -592,6 +886,13 @@ export function LocationConfigPage() {
                               className="text-slate-400 hover:text-blue-600 ml-0.5"
                             >
                               <Pencil size={10} />
+                            </button>
+                            <button
+                              onClick={e => { e.stopPropagation(); confirmDelete('area', area.id) }}
+                              className="text-slate-400 hover:text-red-500 ml-0.5"
+                              title="Delete area"
+                            >
+                              <Trash2 size={10} />
                             </button>
                           </div>
                         )
@@ -638,12 +939,41 @@ export function LocationConfigPage() {
                         <div className="space-y-1">
                           {expandedArea.locations.map(loc => (
                             <div key={loc.id} className="flex items-center gap-2">
-                              <span className="font-mono text-xs text-slate-700 bg-white border border-slate-200 rounded px-2 py-0.5">
-                                {loc.label}
-                              </span>
-                              <span className="text-xs text-slate-400">
-                                row {loc.row} · shelf {loc.shelf} · level {loc.level}
-                              </span>
+                              {deleteConfirm?.kind === 'location' && deleteConfirm.id === loc.id ? (
+                                <div className="flex items-center gap-1.5 flex-1">
+                                  <span className="text-xs text-red-600 font-medium">Delete {loc.label}?</span>
+                                  <button
+                                    onClick={() => handleDeleteLocation(loc.id)}
+                                    disabled={deleting}
+                                    className="flex items-center gap-1 px-2 py-0.5 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white rounded text-xs transition-colors"
+                                  >
+                                    {deleting ? <Loader2 size={10} className="animate-spin" /> : null}
+                                    Delete
+                                  </button>
+                                  <button onClick={cancelDelete} disabled={deleting} className="px-2 py-0.5 border border-slate-200 text-slate-600 rounded text-xs hover:bg-slate-50 transition-colors">
+                                    Cancel
+                                  </button>
+                                  {deleteError && deleteConfirm.id === loc.id && (
+                                    <span className="text-xs text-red-600">{deleteError}</span>
+                                  )}
+                                </div>
+                              ) : (
+                                <>
+                                  <span className="font-mono text-xs text-slate-700 bg-white border border-slate-200 rounded px-2 py-0.5">
+                                    {loc.label}
+                                  </span>
+                                  <span className="text-xs text-slate-400">
+                                    row {loc.row} · shelf {loc.shelf} · level {loc.level}
+                                  </span>
+                                  <button
+                                    onClick={() => confirmDelete('location', loc.id)}
+                                    className="p-0.5 text-slate-300 hover:text-red-500 rounded transition-colors ml-auto"
+                                    title="Delete location"
+                                  >
+                                    <Trash2 size={11} />
+                                  </button>
+                                </>
+                              )}
                             </div>
                           ))}
                         </div>

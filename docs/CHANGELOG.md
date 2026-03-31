@@ -6,6 +6,124 @@
 
 ---
 
+## [2026-03-31]
+
+### Added
+- **Site deletion** — Sites can now be deleted from the Location Config page.
+  - `frontend/src/pages/admin/AdminPages.tsx`: Added delete button (trash icon) next to each site name with inline confirmation dialog.
+  - Delete button only appears when site is not being edited.
+
+### Fixed
+- **Delete location/area/building requests** — error "Body cannot be empty when content-type is set to 'application/json'".
+  - `frontend/src/api/client.ts`: Fixed `apiFetch` function to only set `Content-Type: application/json` header when request has a body.
+  - DELETE requests without body no longer send the `Content-Type` header, preventing middleware validation errors.
+- **Delete building icon visibility** — trash icon was too light to see in LocationConfigPage.
+  - `frontend/src/pages/admin/AdminPages.tsx`: Changed color of delete icon from `text-slate-300` to `text-slate-400` for better visibility.
+- **Move Item operation** — form was allowing submission without required destination, causing backend validation errors.
+  - `frontend/src/pages/operations/OperationsPages.tsx`: `MovePage` component updated:
+    - Submit button now disabled until both item AND at least one destination (location or container) are selected.
+    - Added client-side validation in `handleSubmit` to check at least one destination is selected, shows error if not.
+    - Updated labels to clarify both location and container are optional but at least one must be selected.
+    - Changed placeholder text from "Select destination" to "Select location" and "Select container" respectively.
+    - Added helper text: "Select at least one destination (location or container)".
+
+### Added
+- **Password management** — users can now set and change local passwords.
+  - `backend/prisma/schema.prisma`: Added nullable `passwordHash String?` to `User` model. Stores scrypt-derived hash (`hash:salt`, hex-encoded). LDAP users may never have this set.
+  - `backend/prisma/migrations/20260331000000_add_password_hash/migration.sql`: Migration to `ALTER TABLE "User" ADD COLUMN "passwordHash" TEXT`.
+  - `backend/src/routes/users.ts`: Added `PATCH /users/:id/password` endpoint.
+    - **Admin**: can set any user's password without providing a current password.
+    - **Any authenticated user**: can change their own password; must provide `currentPassword` for verification. Returns 400 if no local password has been set yet (admin must set one first).
+    - Minimum 8 characters, max 128.
+  - `backend/src/routes/auth.ts`: Login now falls back to local password when LDAP is unavailable. If LDAP throws, the backend checks whether the user has a stored `passwordHash` and verifies it. This supports manually-created accounts that are not in Active Directory.
+  - `frontend/src/api/users.ts`: Added `setUserPassword(id, newPassword)` and `changeMyPassword(id, currentPassword, newPassword)`.
+  - `frontend/src/api/index.ts`: Exported new functions + `PasswordResponse` type.
+  - `frontend/src/pages/admin/AdminPages.tsx`: Added **"Pwd" button** in the Actions column of the Users table. Opens a modal to set the password for any user (Admin only, no current password required). Shows success state and auto-closes.
+  - `frontend/src/components/layout/Header.tsx`: Added **user avatar dropdown** visible to all authenticated users (top-right of header). Shows display name, role, and two actions: **Change Password** (opens modal requiring current + new password) and **Sign Out**. The "Change Password" flow calls the backend with `currentPassword` for verification.
+
+### Fixed
+- `frontend/src/context/AuthContext.tsx`: Dev auto-login no longer drops to the login page when a JWT session expires. The `auth:session-expired` handler now re-triggers `authApi.login(DEV_USERNAME, DEV_PASSWORD)` instead of just clearing user state — the auto-login `useEffect` has empty deps so it only runs once at mount and wouldn't re-run after expiry.
+
+- `backend/src/routes/sites.ts`: DELETE endpoints for locations, areas, and buildings.
+  - `DELETE /locations/:locationId` — blocks if any `IN_STORAGE` items or containers are at the location.
+  - `DELETE /areas/:areaId` — blocks if any active items or containers exist in any location within the area; cascades deletion of all child locations.
+  - `DELETE /buildings/:buildingId` — blocks if any active items or containers exist anywhere in the building; cascades deletion of all locations and areas.
+  - All three return `409 Conflict` with a human-readable count ("Cannot delete: 3 items stored at this location").
+  - All require Admin role.
+- `frontend/src/api/sites.ts`: Added `deleteLocation`, `deleteArea`, `deleteBuilding` API functions (use `apiDelete`).
+- `frontend/src/api/index.ts`: Exported the three new delete functions.
+- `frontend/src/pages/admin/AdminPages.tsx`: Delete buttons with inline confirmation in `LocationConfigPage`.
+  - Trash icon on each location row, area chip, and building header (visible to Admin only, which is the entire page).
+  - Clicking shows an inline "Delete X?" prompt with **Delete** / **Cancel** buttons — no full-page modal needed.
+  - On 409 error the message from the backend (e.g. "Cannot delete: 2 items stored in this area") is shown inline next to the buttons.
+  - On success the deleted entity is removed from local state immediately.
+
+### Changed
+- `frontend/src/pages/items/AddItemPage.tsx`: Redesigned Electronics, Spare Part, and Consumable forms to use compact inline label layout.
+  - Added `InlineField` component (renders as fragment → two direct grid children: label + content div).
+  - Added `INLINE_GRID` constant: `grid-cols-[max-content_1fr]` on mobile, `grid-cols-[max-content_1fr_max-content_1fr]` on desktop (4-col).
+  - Fields now appear as `[label] [input] [label] [input]` per row — same data-table density as ItemListPage.
+  - Comment textarea uses `wide` + `alignTop` props to span full remaining width with top-aligned label.
+  - Electronics: 11 fields now fit in 6 rows instead of ~11. Spare Part: 7 fields in 4 rows. Consumable: 10 fields in 6 rows.
+  - Fixture and Misc forms unchanged (not requested).
+
+### Fixed
+- `frontend/src/api/client.ts` + `frontend/src/context/AuthContext.tsx`: Session expiry now correctly redirects to login.
+  - When a 401 response can't be refreshed, `client.ts` now dispatches `auth:session-expired` on `window` before throwing.
+  - `AuthContext` listens for this event and clears `user` state, which causes `ProtectedRoute` to redirect to `/login`.
+  - Previously, tokens were cleared but the user remained "authenticated" in context, so the session expired error was shown in-page with no redirect.
+- `frontend/src/pages/items/AddItemPage.tsx`: Removed horizontal scrollbars from all Comment textareas.
+  - Added `overflow-x-hidden` to every textarea's className (5 occurrences across all form types).
+  - Root cause: textarea intrinsic min-width could exceed the grid column width, causing browser to render a horizontal scrollbar.
+
+### Decided
+- **Dev Auth Bypass — Active for Frontend Integration Phase**
+  - Keep `DEV_AUTH=true` (backend) and `VITE_DEV_AUTO_LOGIN=true` (frontend) enabled during development/integration phase.
+  - Rationale: Rapid frontend development iteration without LDAP or manual login on every page reload.
+  - Status: ✅ Active — bypass is fully functional with auto-login as `admin`/`admin`.
+  - When to disable: Before production deployment, remove both env flags. See [DECISIONS.md](DECISIONS.md#2026-03-31--dev-auth-bypass--active-for-frontend-integration-phase).
+
+---
+
+## [2026-03-31] — Forms & Cards: Condensed Padding Across All Pages
+
+### Changed
+- `frontend/src/pages/items/AddItemPage.tsx` / `EditItemPage`: Reduced all form density.
+  - `inputClass`: `py-2.5` → `py-1.5` on all text/select/textarea inputs.
+  - `FormField` label: `mb-1.5` → `mb-1`.
+  - All form grid gaps: `gap-5` → `gap-3`.
+  - Page and form wrappers: `space-y-5` → `space-y-3`.
+  - Card content areas: `p-5` → `p-4`; storage location section `gap-5` → `gap-3`.
+  - Read-only Lab ID input in EditItemPage: `py-2.5` → `py-1.5`.
+  - Action buttons: `px-5 py-2` / `px-4 py-2` → `px-4 py-1.5` / `px-3 py-1.5`.
+- `frontend/src/pages/operations/OperationsPages.tsx`: Condensed all operation forms.
+  - `inputClass`: `py-2.5` → `py-1.5`.
+  - All field labels: `mb-1.5` → `mb-1`.
+  - StepHeader margin: `mb-6` → `mb-3`.
+  - Item search result rows: `px-4 py-3` → `px-3 py-2`.
+  - Page wrappers: `space-y-5` → `space-y-3`.
+  - Card form containers: `p-5 space-y-4` → `p-4 space-y-3`; all inline `space-y-4` → `space-y-3`.
+  - Confirmation/warning boxes: `p-4` → `p-3`.
+  - Action button rows: `pt-2` → `pt-1`; buttons `px-5 py-2` / `px-4 py-2` → `px-4 py-1.5` / `px-3 py-1.5`.
+- `frontend/src/pages/items/ItemDetailPage.tsx`: Tightened detail view.
+  - Page wrapper: `space-y-5` → `space-y-3`.
+  - Header card: `p-5` → `p-4`; location bar `mt-4 pt-4` → `mt-3 pt-3`.
+  - Two-column grid: `gap-5` → `gap-4`.
+  - Item Details body: `p-5 gap-x-6 gap-y-4` → `p-4 gap-x-4 gap-y-2.5`.
+  - Footer metadata row: `pt-4 gap-4` → `pt-3 gap-3`.
+  - Operation History body: `p-5` → `p-4`; timeline `space-y-4` → `space-y-3`.
+  - Header action buttons: `px-3 py-1.5` → `px-2.5 py-1` for all 6 action buttons.
+- `frontend/src/pages/storage/StoragePages.tsx`: Condensed storage browsing.
+  - Admin banner: `p-4` → `p-3`.
+  - Tree panel rows (Sites, Buildings, Areas): `px-4 py-3` → `px-3 py-2`.
+  - Location grid (area view): container `p-4` → `p-3`; location buttons `p-4` → `p-3`.
+  - Items-at-location links: `py-3` → `py-2`.
+  - Container cards: `p-4` → `p-3`; icon `w-9 h-9` → `w-8 h-8`; icon size `18` → `15`.
+  - External location cards: body and footer both `p-4` → `p-3`.
+  - Page wrappers: `space-y-5` → `space-y-4`.
+
+---
+
 ## [2026-03-30] — All Tables: Dense View, No Word Wrap & Resizable Columns
 
 ### Changed
