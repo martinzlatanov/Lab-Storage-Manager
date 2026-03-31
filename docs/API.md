@@ -44,19 +44,22 @@
 |---|---|---|---|---|
 | GET | `/sites` | All | List all sites (includes buildings) | ✅ |
 | POST | `/sites` | Admin | Create site | ✅ |
+| PATCH | `/sites/:id` | Admin | Rename site — 409 if name already taken | ✅ |
 | DELETE | `/sites/:id` | Admin | Delete site + child buildings/areas/locations — 409 if any IN_STORAGE items or containers exist within | ✅ |
 | GET | `/sites/tree` | All | Full hierarchy (sites→buildings→areas→locations) | ✅ |
 | GET | `/sites/:id/buildings` | All | List buildings in site (includes areas) | ✅ |
 | POST | `/sites/:id/buildings` | Admin | Create building | ✅ |
 | GET | `/buildings/:id/areas` | All | List storage areas in building (includes locations) | ✅ |
 | POST | `/buildings/:id/areas` | Admin | Create storage area | ✅ |
+| PATCH | `/buildings/:id` | Admin | Rename building — 409 if name already taken in same site | ✅ |
+| DELETE | `/buildings/:id` | Admin | Delete building + child areas/locations — 409 if any IN_STORAGE items or containers exist within | ✅ |
 | GET | `/areas/:id/locations` | All | List locations in area | ✅ |
 | POST | `/areas/:id/locations` | Admin | Create storage location | ✅ |
+| PATCH | `/areas/:id` | Admin | Rename area code — cascades label update to all child locations; 409 if code taken in same building | ✅ |
+| DELETE | `/areas/:id` | Admin | Delete area + child locations — 409 if any IN_STORAGE items or containers exist within | ✅ |
 | GET | `/locations` | PUBLIC | Flat list of all locations (for dropdowns; includes siteName, buildingName) | ✅ |
 | GET | `/locations/:id` | All | Get location detail + items + containers | ✅ |
 | DELETE | `/locations/:id` | Admin | Delete location — 409 if any IN_STORAGE items or containers present | ✅ |
-| DELETE | `/areas/:id` | Admin | Delete area + child locations — 409 if any IN_STORAGE items or containers exist within | ✅ |
-| DELETE | `/buildings/:id` | Admin | Delete building + child areas + locations — 409 if any IN_STORAGE items or containers exist within | ✅ |
 | GET | `/external-locations` | All | List external locations | ✅ |
 | GET | `/external-locations/:id` | All | Get external location detail + items in TEMP_EXIT | ✅ |
 | POST | `/external-locations` | Admin | Create external location | ✅ |

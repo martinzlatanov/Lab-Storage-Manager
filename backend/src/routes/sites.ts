@@ -22,6 +22,10 @@ const CreateLocationBody = z.object({
   level: z.string().min(1).max(10),
 });
 
+const RenameSiteBody = z.object({ name: z.string().min(1).max(100) });
+const RenameBuildingBody = z.object({ name: z.string().min(1).max(100) });
+const RenameAreaBody = z.object({ code: z.string().min(1).max(10).toUpperCase() });
+
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
 export default async function sitesRoutes(app: FastifyInstance) {
@@ -472,6 +476,106 @@ export default async function sitesRoutes(app: FastifyInstance) {
       await prisma.storageArea.deleteMany({ where: { buildingId } });
       await prisma.building.delete({ where: { id: buildingId } });
       return reply.send({ success: true });
+    }
+  );
+
+  // PATCH /api/v1/sites/:siteId — rename site
+  app.patch(
+    "/sites/:siteId",
+    { preHandler: [app.authenticate, app.requireRole("ADMIN")] },
+    async (req, reply) => {
+      const { siteId } = req.params as { siteId: string };
+      const body = RenameSiteBody.safeParse(req.body);
+      if (!body.success) {
+        return reply.status(400).send({ success: false, error: "Invalid request body" });
+      }
+
+      const site = await prisma.site.findUnique({ where: { id: siteId } });
+      if (!site) {
+        return reply.status(404).send({ success: false, error: "Site not found" });
+      }
+
+      const conflict = await prisma.site.findFirst({
+        where: { name: body.data.name, id: { not: siteId } },
+      });
+      if (conflict) {
+        return reply.status(409).send({ success: false, error: "A site with this name already exists" });
+      }
+
+      const updated = await prisma.site.update({ where: { id: siteId }, data: { name: body.data.name } });
+      return reply.send({ success: true, data: updated });
+    }
+  );
+
+  // PATCH /api/v1/buildings/:buildingId — rename building
+  app.patch(
+    "/buildings/:buildingId",
+    { preHandler: [app.authenticate, app.requireRole("ADMIN")] },
+    async (req, reply) => {
+      const { buildingId } = req.params as { buildingId: string };
+      const body = RenameBuildingBody.safeParse(req.body);
+      if (!body.success) {
+        return reply.status(400).send({ success: false, error: "Invalid request body" });
+      }
+
+      const building = await prisma.building.findUnique({ where: { id: buildingId } });
+      if (!building) {
+        return reply.status(404).send({ success: false, error: "Building not found" });
+      }
+
+      const conflict = await prisma.building.findFirst({
+        where: { siteId: building.siteId, name: body.data.name, id: { not: buildingId } },
+      });
+      if (conflict) {
+        return reply.status(409).send({ success: false, error: "A building with this name already exists in this site" });
+      }
+
+      const updated = await prisma.building.update({ where: { id: buildingId }, data: { name: body.data.name } });
+      return reply.send({ success: true, data: updated });
+    }
+  );
+
+  // PATCH /api/v1/areas/:areaId — rename area
+  app.patch(
+    "/areas/:areaId",
+    { preHandler: [app.authenticate, app.requireRole("ADMIN")] },
+    async (req, reply) => {
+      const { areaId } = req.params as { areaId: string };
+      const body = RenameAreaBody.safeParse(req.body);
+      if (!body.success) {
+        return reply.status(400).send({ success: false, error: "Invalid request body" });
+      }
+
+      const area = await prisma.storageArea.findUnique({
+        where: { id: areaId },
+        include: { locations: true },
+      });
+      if (!area) {
+        return reply.status(404).send({ success: false, error: "Storage area not found" });
+      }
+
+      const conflict = await prisma.storageArea.findFirst({
+        where: { buildingId: area.buildingId, code: body.data.code, id: { not: areaId } },
+      });
+      if (conflict) {
+        return reply.status(409).send({ success: false, error: "An area with this code already exists in this building" });
+      }
+
+      const updated = await prisma.$transaction(async (tx) => {
+        const renamedArea = await tx.storageArea.update({ where: { id: areaId }, data: { code: body.data.code } });
+
+        // Regenerate stored labels for all child locations — label format: "{areaCode}-{row}-{shelf}-{level}"
+        for (const loc of area.locations) {
+          await tx.storageLocation.update({
+            where: { id: loc.id },
+            data: { label: `${body.data.code}-${loc.row}-${loc.shelf}-${loc.level}` },
+          });
+        }
+
+        return renamedArea;
+      });
+
+      return reply.send({ success: true, data: updated });
     }
   );
 

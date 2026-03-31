@@ -17,6 +17,22 @@ import clsx from 'clsx'
 
 const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true'
 
+function downloadCsv(rows: string[][], filename: string) {
+  const csv = rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = filename; a.click()
+  URL.revokeObjectURL(url)
+}
+
+function todayStr() { return new Date().toLocaleDateString('en-CA') }
+
+function isOverdueDate(dateStr: string | null | undefined): boolean {
+  if (!dateStr) return false
+  return dateStr.slice(0, 10) < new Date().toLocaleDateString('en-CA')
+}
+
 function formatDate(iso: string, includeTime = false) {
   return new Intl.DateTimeFormat('en-GB', {
     day: '2-digit',
@@ -83,7 +99,21 @@ export function ItemsByLocationPage() {
           </select>
           <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
         </div>
-        <button className="flex items-center gap-2 border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm px-3 py-2 rounded-lg transition-colors">
+        <button
+          onClick={() => {
+            const header = ['Lab ID', 'Type', 'Status', 'Location']
+            const rows = USE_MOCKS
+              ? Object.entries(mockGroups).flatMap(([loc, items]) =>
+                  items.map(i => [i.labIdNumber, i.itemType, i.status, loc])
+                )
+              : apiData.flatMap(loc => [
+                  ...loc.items.map(i => [i.labIdNumber, i.itemType, i.status, loc.label]),
+                  ...loc.containers.flatMap(c => c.items.map(i => [i.labIdNumber, i.itemType, i.status, loc.label])),
+                ])
+            downloadCsv([header, ...rows], `items-by-location-${todayStr()}.csv`)
+          }}
+          className="flex items-center gap-2 border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm px-3 py-2 rounded-lg transition-colors"
+        >
           <Download size={14} />
           Export CSV
         </button>
@@ -201,9 +231,7 @@ export function ExternalReportPage() {
 
   // Mock mode
   const externalItems = USE_MOCKS ? MOCK_ITEMS.filter(i => i.status === ItemStatus.TEMP_EXIT) : []
-  const mockOverdueItems = externalItems.filter(i =>
-    i.expectedReturnDate != null && new Date(i.expectedReturnDate) < new Date()
-  )
+  const mockOverdueItems = externalItems.filter(i => isOverdueDate(i.expectedReturnDate))
 
   // API mode
   const overdueCount = apiData.filter(r => r.isOverdue).length
@@ -231,7 +259,22 @@ export function ExternalReportPage() {
           title="Items at External Locations"
           subtitle={`${USE_MOCKS ? externalItems.length : apiData.length} item${(USE_MOCKS ? externalItems.length : apiData.length) !== 1 ? 's' : ''} currently away`}
           actions={
-            <button className="flex items-center gap-2 border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs px-3 py-1.5 rounded-lg transition-colors">
+            <button
+              onClick={() => {
+                const header = ['Lab ID', 'Type', 'External Location', 'Expected Return', 'Status']
+                const rows = USE_MOCKS
+                  ? externalItems.map(item => {
+                      const exitOp = MOCK_OPERATIONS.find(op => op.itemId === item.id && op.operationType === OperationType.TEMP_EXIT)
+                      return [item.labIdNumber, item.itemType, item.externalLocationName ?? '', exitOp?.expectedReturnDate ? formatDate(exitOp.expectedReturnDate) : '', isOverdueDate(item.expectedReturnDate) ? 'Overdue' : 'Away']
+                    })
+                  : apiData.map(rec => {
+                      const extLoc = rec.item.externalLocation ?? rec.toExternalLocation
+                      return [rec.item.labIdNumber, rec.item.itemType, extLoc ? `${extLoc.name} (${extLoc.city})` : '', rec.expectedReturnDate ? formatDate(rec.expectedReturnDate) : '', rec.isOverdue ? 'Overdue' : 'Away']
+                    })
+                downloadCsv([header, ...rows], `external-items-${todayStr()}.csv`)
+              }}
+              className="flex items-center gap-2 border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs px-3 py-1.5 rounded-lg transition-colors"
+            >
               <Download size={12} />
               Export
             </button>
@@ -262,7 +305,7 @@ export function ExternalReportPage() {
               <tbody className="divide-y divide-slate-50">
                 {USE_MOCKS ? (
                   externalItems.map(item => {
-                    const isOverdue = item.expectedReturnDate != null && new Date(item.expectedReturnDate) < new Date()
+                    const isOverdue = isOverdueDate(item.expectedReturnDate)
                     const exitOp = MOCK_OPERATIONS.find(op => op.itemId === item.id && op.operationType === OperationType.TEMP_EXIT)
                     return (
                       <tr key={item.id} className={clsx('hover:bg-slate-50 transition-colors', isOverdue && 'bg-red-50/30')}>
@@ -376,14 +419,15 @@ export function ExpiryReportPage() {
 
   // Summary counts
   const expiredCount = USE_MOCKS
-    ? mockSorted.filter(c => c.expiryDate && new Date(c.expiryDate) < new Date()).length
+    ? mockSorted.filter(c => isOverdueDate(c.expiryDate)).length
     : apiItems.filter(i => i.daysUntilExpiry !== null && i.daysUntilExpiry !== undefined && i.daysUntilExpiry < 0).length
 
   const soonCount = USE_MOCKS
     ? mockSorted.filter(c => {
         if (!c.expiryDate) return false
-        const d = (new Date(c.expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-        return d >= 0 && d <= 30
+        const today = new Date().toLocaleDateString('en-CA')
+        const in30 = new Date(Date.now() + 30 * 86400000).toLocaleDateString('en-CA')
+        return c.expiryDate.slice(0, 10) >= today && c.expiryDate.slice(0, 10) <= in30
       }).length
     : apiItems.filter(i => i.daysUntilExpiry !== null && i.daysUntilExpiry !== undefined && i.daysUntilExpiry >= 0 && i.daysUntilExpiry <= 30).length
 
@@ -423,7 +467,23 @@ export function ExpiryReportPage() {
           title="Consumables by Expiry"
           subtitle="Sorted by expiry date, soonest first"
           actions={
-            <button className="flex items-center gap-2 border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs px-3 py-1.5 rounded-lg transition-colors">
+            <button
+              onClick={() => {
+                const header = ['Lab ID', 'Type', 'Quantity', 'Unit', 'Lot #', 'Expiry Date', 'Days Left', 'Location']
+                const rows = USE_MOCKS
+                  ? mockSorted.map(c => {
+                      const { label } = getMockExpiryStatus(c)
+                      return [c.labIdNumber, c.consumableType, String(c.quantity), c.unit, c.lotNumber ?? '', c.expiryDate ? formatDate(c.expiryDate) : '', label, c.locationLabel ?? '']
+                    })
+                  : apiItems.map(i => {
+                      const days = i.daysUntilExpiry
+                      const daysLabel = days === null || days === undefined ? 'No expiry' : days < 0 ? 'Expired' : `${days}d`
+                      return [i.labIdNumber, i.consumableType ?? '', String(i.quantity), i.unit, i.lotNumber ?? '', i.expiryDate ? formatDate(i.expiryDate) : '', daysLabel, i.location?.label ?? i.container?.label ?? '']
+                    })
+                downloadCsv([header, ...rows], `expiry-report-${todayStr()}.csv`)
+              }}
+              className="flex items-center gap-2 border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs px-3 py-1.5 rounded-lg transition-colors"
+            >
               <Download size={12} />
               Export
             </button>
@@ -514,12 +574,18 @@ export function ExpiryReportPage() {
 export function AuditLogPage() {
   const [opTypeFilter, setOpTypeFilter] = useState<OperationType | ''>('')
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [loading, setLoading] = useState(!USE_MOCKS)
   const [error, setError] = useState('')
   const [apiRecords, setApiRecords] = useState<AuditReportRecord[]>([])
   const [total, setTotal] = useState(0)
   const [colWidths, setColWidths] = useState([130, 100, 90, 130, 280])
   const resizeRef = useRef<{ col: number; startX: number; startWidth: number } | null>(null)
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 400)
+    return () => clearTimeout(t)
+  }, [search])
   useEffect(() => {
     function onMouseMove(e: MouseEvent) {
       if (!resizeRef.current) return
@@ -539,6 +605,7 @@ export function AuditLogPage() {
     try {
       const res = await getReportAudit({
         ...(opTypeFilter ? { operationType: opTypeFilter } : {}),
+        ...(debouncedSearch ? { search: debouncedSearch } : {}),
         pageSize: 100,
       })
       setApiRecords(res.data)
@@ -548,7 +615,7 @@ export function AuditLogPage() {
     } finally {
       setLoading(false)
     }
-  }, [opTypeFilter])
+  }, [opTypeFilter, debouncedSearch])
 
   useEffect(() => { fetchAudit() }, [fetchAudit])
 
@@ -604,7 +671,16 @@ export function AuditLogPage() {
           </select>
           <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
         </div>
-        <button className="flex items-center gap-2 border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm px-3 py-2 rounded-lg transition-colors ml-auto">
+        <button
+          onClick={() => {
+            const header = ['Date', 'Operation', 'Lab ID', 'Performed By', 'Details']
+            const rows = USE_MOCKS
+              ? mockFiltered.map(op => [formatDate(op.performedAt, true), op.operationType, op.itemLabId, op.performedByName, op.notes ?? ''])
+              : (apiFiltered as AuditReportRecord[]).map(op => [formatDate(op.performedAt, true), op.operationType, op.item.labIdNumber, op.performedBy.displayName, op.notes ?? ''])
+            downloadCsv([header, ...rows], `audit-log-${todayStr()}.csv`)
+          }}
+          className="flex items-center gap-2 border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm px-3 py-2 rounded-lg transition-colors ml-auto"
+        >
           <Download size={14} />
           Export CSV
         </button>

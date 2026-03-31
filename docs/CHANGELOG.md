@@ -8,13 +8,25 @@
 
 ## [2026-03-31]
 
+### Changed
+- **UI design refresh — typography, sidebar, dashboard** (`frontend/index.html`, `frontend/tailwind.config.js`, `frontend/src/index.css`, `frontend/src/components/layout/Sidebar.tsx`, `frontend/src/components/layout/Header.tsx`, `frontend/src/components/ui/Card.tsx`, `frontend/src/pages/dashboard/DashboardPage.tsx`):
+  - Added **Barlow** (UI font) + **IBM Plex Mono** (data/numbers) via Google Fonts; replaced system-ui
+  - **Sidebar active state** changed from full `bg-blue-600` fill to left-border accent (`border-l-2 border-blue-500 bg-blue-500/10 text-blue-300`) — more refined
+  - **Sidebar logo** upgraded to gradient background with drop shadow; subtitle colour changed to `blue-500/60`
+  - **Header page title** enlarged (`text-lg tracking-tight`); search bar now has a visible border
+  - **Dashboard stat cards** each get a contextual icon, stat numbers use `font-mono`, labels use `tracking-widest`
+  - **Items-by-type grid** icon containers fixed: were `bg-{color}` (same as parent card, invisible) → now `bg-white/80 shadow-sm`
+  - `CardHeader` title uses `tracking-tight` for sharper rendering
+
+### Fixed
+- **BUG-023 — Site/building/area rename now works** (`backend/src/routes/sites.ts`, `frontend/src/api/sites.ts`, `frontend/src/pages/admin/AdminPages.tsx`): Added `PATCH /sites/:siteId`, `PATCH /buildings/:buildingId`, `PATCH /areas/:areaId` backend routes with 409 conflict checks. Area rename regenerates all child location labels in a DB transaction (label format `{areaCode}-{row}-{shelf}-{level}`). Frontend `saveEdit()` now calls the API and updates local state; errors surface in the error banner.
+- **BUG-011 — Barcode uniqueness fully enforced (Backend)** (`backend/src/routes/items.ts`, `schema.prisma`): Confirmed all item creation endpoints require `barcode` as a non-optional field; 409 conflict check at application layer + `@unique` DB constraint prevent duplicates. Silent fallback to `labIdNumber` does not exist. Bug closed.
+- **BUG-026 — External Location form is now functional** (`frontend/src/pages/admin/AdminPages.tsx`): Form inputs are now controlled with state. Save button calls `POST /external-locations`. Also added an Edit modal wired to `PATCH /external-locations/:id`. List loads from API on mount instead of mock data.
+- **Backend debug logs removed** (`backend/src/routes/sites.ts`): Removed 12 debug `console.log`/`console.error` statements left in `POST /areas/:areaId/locations` and `GET /locations` handlers.
+
 ### Added
 - **`docker-compose.dev.yml`** — single-command dev stack with auth fully bypassed: `DEV_AUTH=true` on backend (skips LDAP, accepts any credentials, auto-creates ADMIN user), `VITE_DEV_AUTO_LOGIN=true` on frontend (skips login form entirely). Run with `docker compose -f docker-compose.dev.yml up --build`.
 - **Frontend Dockerfile** — added `ARG`/`ENV` support for `VITE_DEV_AUTO_LOGIN`, `VITE_DEV_USERNAME`, `VITE_DEV_PASSWORD` so Vite bakes them into the bundle at build time.
-
-### Fixed
-- **BUG-011 — Barcode uniqueness now fully enforced (Backend)**: Confirmed that all item creation endpoints require `barcode` as a non-optional field; a 409 conflict check at the application layer and `@unique` DB constraint together prevent duplicates. The silent fallback to `labIdNumber` does not exist in current code. Bug closed.
-- **Backend debug logs removed** (`backend/src/routes/sites.ts`): Removed 12 debug `console.log`/`console.error` statements left in `POST /areas/:areaId/locations` and `GET /locations` handlers — analogous to BUG-032 on the frontend side.
 
 ### Added
 - **QA audit — 16 new defects logged** (`docs/BUGS.md`):

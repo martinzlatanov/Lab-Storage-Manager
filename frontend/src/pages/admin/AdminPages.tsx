@@ -8,8 +8,8 @@ import { Plus, Shield, User, Eye, CheckCircle2, XCircle, Pencil, Save, X, Chevro
 import { Card, CardHeader } from '../../components/ui/Card'
 import { Badge } from '../../components/ui/Badge'
 import { MOCK_USERS, MOCK_SITES, MOCK_EXTERNAL_LOCATIONS } from '../../mock/data'
-import { UserRole, type Site, type User as AppUser } from '../../types'
-import { getSitesTree, createSite, createBuilding, createArea, createLocation, deleteLocation, deleteArea, deleteBuilding, deleteSite, getUsers, createUser, updateUser, deactivateUser, setUserPassword, createExternalLocation } from '../../api'
+import { UserRole, type Site, type User as AppUser, type ExternalLocation } from '../../types'
+import { getSitesTree, createSite, createBuilding, createArea, createLocation, deleteLocation, deleteArea, deleteBuilding, deleteSite, updateSite, updateBuilding, updateArea, getUsers, createUser, updateUser, deactivateUser, setUserPassword, createExternalLocation, getExternalLocations, updateExternalLocation } from '../../api'
 import clsx from 'clsx'
 
 const inputClass =
@@ -513,10 +513,34 @@ export function LocationConfigPage() {
 
   function cancelEdit() { setEditTarget(null) }
 
-  function saveEdit() {
+  async function saveEdit() {
     if (!editTarget || !editValue.trim()) return cancelEdit()
-    setError('Rename is not yet supported — backend PUT endpoints are not implemented.')
+    const target = editTarget
+    const value = editValue.trim()
     cancelEdit()
+    try {
+      if (target.kind === 'site') {
+        await updateSite(target.id, value)
+        setSites(prev => prev.map(s => s.id === target.id ? { ...s, name: value } : s))
+      } else if (target.kind === 'building') {
+        await updateBuilding(target.id, value)
+        setSites(prev => prev.map(s => ({
+          ...s,
+          buildings: s.buildings.map(b => b.id === target.id ? { ...b, name: value } : b),
+        })))
+      } else if (target.kind === 'area') {
+        await updateArea(target.id, value.toUpperCase())
+        setSites(prev => prev.map(s => ({
+          ...s,
+          buildings: s.buildings.map(b => ({
+            ...b,
+            storageAreas: b.storageAreas.map(a => a.id === target.id ? { ...a, code: value.toUpperCase() } : a),
+          })),
+        })))
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save changes')
+    }
   }
 
   async function doAddSite() {
@@ -1151,12 +1175,123 @@ export function LocationConfigPage() {
 
 export function ExternalLocationAdminPage() {
   const [showForm, setShowForm] = useState(false)
+  const [extName, setExtName] = useState('')
+  const [extContact, setExtContact] = useState('')
+  const [extCity, setExtCity] = useState('')
+  const [extAddress, setExtAddress] = useState('')
+  const [extCountry, setExtCountry] = useState('')
+  const [extPhone, setExtPhone] = useState('')
+  const [extEmail, setExtEmail] = useState('')
+  const [extNotes, setExtNotes] = useState('')
+  const [extSaving, setExtSaving] = useState(false)
+  const [extError, setExtError] = useState('')
+  const [extLocations, setExtLocations] = useState<ExternalLocation[]>([])
+
+  // Edit modal state
+  const [editingExt, setEditingExt] = useState<ExternalLocation | null>(null)
+  const [editExtName, setEditExtName] = useState('')
+  const [editExtContact, setEditExtContact] = useState('')
+  const [editExtCity, setEditExtCity] = useState('')
+  const [editExtAddress, setEditExtAddress] = useState('')
+  const [editExtCountry, setEditExtCountry] = useState('')
+  const [editExtPhone, setEditExtPhone] = useState('')
+  const [editExtEmail, setEditExtEmail] = useState('')
+  const [editExtNotes, setEditExtNotes] = useState('')
+  const [editExtSaving, setEditExtSaving] = useState(false)
+  const [editExtError, setEditExtError] = useState('')
+
+  useEffect(() => {
+    if (USE_MOCKS) return
+    getExternalLocations().then(res => setExtLocations(res.data)).catch(() => {})
+  }, [])
+
+  function openEditExt(loc: ExternalLocation) {
+    setEditingExt(loc)
+    setEditExtName(loc.name)
+    setEditExtContact(loc.contactPerson)
+    setEditExtCity(loc.city)
+    setEditExtAddress(loc.address)
+    setEditExtCountry(loc.country ?? '')
+    setEditExtPhone(loc.phone ?? '')
+    setEditExtEmail(loc.email ?? '')
+    setEditExtNotes(loc.notes ?? '')
+    setEditExtError('')
+  }
+
+  function closeEditExt() { setEditingExt(null); setEditExtError('') }
+
+  async function handleUpdateExtLocation() {
+    if (!editingExt) return
+    if (!editExtName.trim() || !editExtContact.trim() || !editExtCity.trim() || !editExtAddress.trim()) {
+      setEditExtError('Name, contact person, city, and address are required.')
+      return
+    }
+    setEditExtError('')
+    setEditExtSaving(true)
+    try {
+      const res = await updateExternalLocation(editingExt.id, {
+        name: editExtName.trim(), contactPerson: editExtContact.trim(), city: editExtCity.trim(),
+        address: editExtAddress.trim(), country: editExtCountry.trim() || undefined,
+        phone: editExtPhone.trim() || undefined, email: editExtEmail.trim() || undefined,
+        notes: editExtNotes.trim() || undefined,
+      })
+      setExtLocations(prev => prev.map(l => l.id === editingExt.id ? res.data : l))
+      closeEditExt()
+    } catch (err) {
+      setEditExtError(err instanceof Error ? err.message : 'Failed to update location')
+    } finally {
+      setEditExtSaving(false)
+    }
+  }
+
+  function resetExtForm() {
+    setExtName(''); setExtContact(''); setExtCity(''); setExtAddress('')
+    setExtCountry(''); setExtPhone(''); setExtEmail(''); setExtNotes('')
+    setExtError('')
+  }
+
+  async function handleSaveExtLocation() {
+    if (!extName.trim() || !extContact.trim() || !extCity.trim() || !extAddress.trim()) {
+      setExtError('Name, contact person, city, and address are required.')
+      return
+    }
+    setExtError('')
+    setExtSaving(true)
+    if (USE_MOCKS) {
+      await new Promise(r => setTimeout(r, 400))
+      setExtLocations(prev => [...prev, {
+        id: `ext-${Date.now()}`, name: extName.trim(), contactPerson: extContact.trim(),
+        city: extCity.trim(), address: extAddress.trim(), country: extCountry.trim() || undefined,
+        phone: extPhone.trim() || undefined, email: extEmail.trim() || undefined,
+        notes: extNotes.trim() || undefined,
+      }])
+      setExtSaving(false)
+      setShowForm(false)
+      resetExtForm()
+      return
+    }
+    try {
+      const res = await createExternalLocation({
+        name: extName.trim(), contactPerson: extContact.trim(), city: extCity.trim(),
+        address: extAddress.trim(), country: extCountry.trim() || undefined,
+        phone: extPhone.trim() || undefined, email: extEmail.trim() || undefined,
+        notes: extNotes.trim() || undefined,
+      })
+      setExtLocations(prev => [...prev, res.data])
+      setShowForm(false)
+      resetExtForm()
+    } catch (err) {
+      setExtError(err instanceof Error ? err.message : 'Failed to save location')
+    } finally {
+      setExtSaving(false)
+    }
+  }
 
   return (
     <div className="space-y-5 max-w-3xl">
       <div className="flex justify-end">
         <button
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => { setShowForm(!showForm); resetExtForm() }}
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
         >
           <Plus size={15} />
@@ -1170,40 +1305,46 @@ export function ExternalLocationAdminPage() {
           <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="col-span-full">
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Name <span className="text-red-500">*</span></label>
-              <input type="text" placeholder="BMW Test Center" className={inputClass} />
+              <input type="text" placeholder="BMW Test Center" value={extName} onChange={e => setExtName(e.target.value)} className={inputClass} />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Contact Person <span className="text-red-500">*</span></label>
-              <input type="text" placeholder="Klaus Weber" className={inputClass} />
+              <input type="text" placeholder="Klaus Weber" value={extContact} onChange={e => setExtContact(e.target.value)} className={inputClass} />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">City <span className="text-red-500">*</span></label>
-              <input type="text" placeholder="Munich" className={inputClass} />
+              <input type="text" placeholder="Munich" value={extCity} onChange={e => setExtCity(e.target.value)} className={inputClass} />
             </div>
             <div className="col-span-full">
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Address <span className="text-red-500">*</span></label>
-              <input type="text" placeholder="Petuelring 130" className={inputClass} />
+              <input type="text" placeholder="Petuelring 130" value={extAddress} onChange={e => setExtAddress(e.target.value)} className={inputClass} />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Country</label>
-              <input type="text" placeholder="Germany" className={inputClass} />
+              <input type="text" placeholder="Germany" value={extCountry} onChange={e => setExtCountry(e.target.value)} className={inputClass} />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Phone</label>
-              <input type="tel" placeholder="+49 89 382 0" className={inputClass} />
+              <input type="tel" placeholder="+49 89 382 0" value={extPhone} onChange={e => setExtPhone(e.target.value)} className={inputClass} />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
-              <input type="email" placeholder="contact@example.com" className={inputClass} />
+              <input type="email" placeholder="contact@example.com" value={extEmail} onChange={e => setExtEmail(e.target.value)} className={inputClass} />
             </div>
             <div className="col-span-full">
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Notes</label>
-              <textarea rows={2} className={clsx(inputClass, 'resize-none')} />
+              <textarea rows={2} value={extNotes} onChange={e => setExtNotes(e.target.value)} className={clsx(inputClass, 'resize-none')} />
             </div>
+            {extError && <p className="col-span-full text-sm text-red-600">{extError}</p>}
             <div className="col-span-full flex justify-end gap-3">
-              <button onClick={() => setShowForm(false)} className="px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 hover:bg-slate-50">Cancel</button>
-              <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2 rounded-lg">
-                <Save size={14} /> Save
+              <button onClick={() => { setShowForm(false); resetExtForm() }} className="px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 hover:bg-slate-50">Cancel</button>
+              <button
+                onClick={handleSaveExtLocation}
+                disabled={extSaving || !extName || !extContact || !extCity || !extAddress}
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium px-5 py-2 rounded-lg"
+              >
+                {extSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                {extSaving ? 'Saving…' : 'Save'}
               </button>
             </div>
           </div>
@@ -1211,22 +1352,80 @@ export function ExternalLocationAdminPage() {
       )}
 
       <div className="space-y-3">
-        {MOCK_EXTERNAL_LOCATIONS.map(ext => (
+        {extLocations.map(ext => (
           <Card key={ext.id} className="p-4">
             <div className="flex items-start justify-between">
               <div>
                 <p className="font-semibold text-slate-800">{ext.name}</p>
-                <p className="text-sm text-slate-500">{ext.address}, {ext.city}, {ext.country}</p>
+                <p className="text-sm text-slate-500">{ext.address}, {ext.city}{ext.country ? `, ${ext.country}` : ''}</p>
                 <p className="text-sm text-slate-500 mt-0.5">Contact: {ext.contactPerson}</p>
                 {ext.notes && <p className="text-xs text-slate-400 italic mt-1">{ext.notes}</p>}
               </div>
-              <button className="flex items-center gap-1 text-xs text-slate-600 border border-slate-200 px-2.5 py-1.5 rounded-lg hover:bg-slate-50 transition-colors">
+              <button onClick={() => openEditExt(ext)} className="flex items-center gap-1 text-xs text-slate-600 border border-slate-200 px-2.5 py-1.5 rounded-lg hover:bg-slate-50 transition-colors">
                 <Pencil size={11} /> Edit
               </button>
             </div>
           </Card>
         ))}
       </div>
+
+      {/* Edit External Location Modal */}
+      {editingExt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={closeEditExt}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-sm font-semibold text-slate-800">Edit External Location</p>
+              <button onClick={closeEditExt} className="p-1 text-slate-400 hover:text-slate-600 rounded transition-colors"><X size={16} /></button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="col-span-full">
+                <label className="block text-xs font-medium text-slate-700 mb-1">Name <span className="text-red-500">*</span></label>
+                <input autoFocus type="text" value={editExtName} onChange={e => setEditExtName(e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">Contact Person <span className="text-red-500">*</span></label>
+                <input type="text" value={editExtContact} onChange={e => setEditExtContact(e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">City <span className="text-red-500">*</span></label>
+                <input type="text" value={editExtCity} onChange={e => setEditExtCity(e.target.value)} className={inputClass} />
+              </div>
+              <div className="col-span-full">
+                <label className="block text-xs font-medium text-slate-700 mb-1">Address <span className="text-red-500">*</span></label>
+                <input type="text" value={editExtAddress} onChange={e => setEditExtAddress(e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">Country</label>
+                <input type="text" value={editExtCountry} onChange={e => setEditExtCountry(e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">Phone</label>
+                <input type="tel" value={editExtPhone} onChange={e => setEditExtPhone(e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">Email</label>
+                <input type="email" value={editExtEmail} onChange={e => setEditExtEmail(e.target.value)} className={inputClass} />
+              </div>
+              <div className="col-span-full">
+                <label className="block text-xs font-medium text-slate-700 mb-1">Notes</label>
+                <textarea rows={2} value={editExtNotes} onChange={e => setEditExtNotes(e.target.value)} className={clsx(inputClass, 'resize-none')} />
+              </div>
+              {editExtError && <p className="col-span-full text-xs text-red-600">{editExtError}</p>}
+              <div className="col-span-full flex gap-2 pt-1">
+                <button
+                  onClick={handleUpdateExtLocation}
+                  disabled={editExtSaving || !editExtName || !editExtContact || !editExtCity || !editExtAddress}
+                  className="flex-1 flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium py-2 rounded-lg transition-colors"
+                >
+                  {editExtSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                  {editExtSaving ? 'Saving…' : 'Save Changes'}
+                </button>
+                <button onClick={closeEditExt} className="px-4 py-2 border border-slate-200 text-slate-600 text-sm rounded-lg hover:bg-slate-50 transition-colors">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -1234,30 +1433,56 @@ export function ExternalLocationAdminPage() {
 // ─── System Settings ──────────────────────────────────────────────────────────
 
 export function SystemSettingsPage() {
+  const [ldapServer, setLdapServer] = useState('ldap://ad.visteon.com:389')
+  const [ldapBaseDn, setLdapBaseDn] = useState('DC=visteon,DC=com')
+  const [ldapBindUser, setLdapBindUser] = useState('CN=svc-labstorage,OU=ServiceAccounts,DC=visteon,DC=com')
+  const [ldapBindPwd, setLdapBindPwd] = useState('')
+
+  const [printerModel, setPrinterModel] = useState('Zebra ZD421')
+  const [printerIp, setPrinterIp] = useState('192.168.10.55')
+  const [labelSize, setLabelSize] = useState('57mm × 32mm')
+
+  const [expiryWarn, setExpiryWarn] = useState('30')
+  const [expiryCritical, setExpiryCritical] = useState('7')
+
+  const [savedSection, setSavedSection] = useState<string | null>(null)
+
+  function showSaved(section: string) {
+    setSavedSection(section)
+    setTimeout(() => setSavedSection(null), 2500)
+  }
+
   return (
     <div className="space-y-5 max-w-2xl">
+      {savedSection && (
+        <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2.5 text-sm text-green-800 flex items-center gap-2">
+          <CheckCircle2 size={15} className="text-green-600" />
+          {savedSection} settings saved.
+        </div>
+      )}
+
       {/* LDAP */}
       <Card>
         <CardHeader title="LDAP Configuration" />
         <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">LDAP Server</label>
-            <input type="text" defaultValue="ldap://ad.visteon.com:389" className={inputClass} />
+            <input type="text" value={ldapServer} onChange={e => setLdapServer(e.target.value)} className={inputClass} />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Base DN</label>
-            <input type="text" defaultValue="DC=visteon,DC=com" className={clsx(inputClass, 'font-mono')} />
+            <input type="text" value={ldapBaseDn} onChange={e => setLdapBaseDn(e.target.value)} className={clsx(inputClass, 'font-mono')} />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Bind User</label>
-            <input type="text" defaultValue="CN=svc-labstorage,OU=ServiceAccounts,DC=visteon,DC=com" className={clsx(inputClass, 'font-mono text-xs')} />
+            <input type="text" value={ldapBindUser} onChange={e => setLdapBindUser(e.target.value)} className={clsx(inputClass, 'font-mono text-xs')} />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Bind Password</label>
-            <input type="password" defaultValue="••••••••••••" className={inputClass} />
+            <input type="password" value={ldapBindPwd} onChange={e => setLdapBindPwd(e.target.value)} placeholder="Enter new password to update" className={inputClass} />
           </div>
           <div className="col-span-full flex justify-end">
-            <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
+            <button onClick={() => showSaved('LDAP')} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
               <Save size={14} /> Save LDAP Config
             </button>
           </div>
@@ -1270,7 +1495,7 @@ export function SystemSettingsPage() {
         <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Printer Model</label>
-            <select className={inputClass}>
+            <select value={printerModel} onChange={e => setPrinterModel(e.target.value)} className={inputClass}>
               <option>Zebra ZD421</option>
               <option>Zebra ZT411</option>
               <option>Brother QL-1110NWB</option>
@@ -1279,11 +1504,11 @@ export function SystemSettingsPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Printer IP / Hostname</label>
-            <input type="text" defaultValue="192.168.10.55" className={clsx(inputClass, 'font-mono')} />
+            <input type="text" value={printerIp} onChange={e => setPrinterIp(e.target.value)} className={clsx(inputClass, 'font-mono')} />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Label Size</label>
-            <select className={inputClass}>
+            <select value={labelSize} onChange={e => setLabelSize(e.target.value)} className={inputClass}>
               <option>57mm × 32mm</option>
               <option>62mm × 29mm</option>
               <option>102mm × 25mm</option>
@@ -1295,7 +1520,7 @@ export function SystemSettingsPage() {
             </button>
           </div>
           <div className="col-span-full flex justify-end">
-            <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
+            <button onClick={() => showSaved('Printer')} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
               <Save size={14} /> Save Printer Config
             </button>
           </div>
@@ -1309,15 +1534,15 @@ export function SystemSettingsPage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Expiry warning (days)</label>
-              <input type="number" defaultValue={30} min={1} className={inputClass} />
+              <input type="number" value={expiryWarn} onChange={e => setExpiryWarn(e.target.value)} min={1} className={inputClass} />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Critical expiry (days)</label>
-              <input type="number" defaultValue={7} min={1} className={inputClass} />
+              <input type="number" value={expiryCritical} onChange={e => setExpiryCritical(e.target.value)} min={1} className={inputClass} />
             </div>
           </div>
           <div className="flex justify-end">
-            <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
+            <button onClick={() => showSaved('Alert thresholds')} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
               <Save size={14} /> Save
             </button>
           </div>

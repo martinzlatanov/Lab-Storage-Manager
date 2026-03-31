@@ -1,6 +1,6 @@
 // ─── Sites & Locations API ────────────────────────────────────────────────────
 
-import { apiGet, apiPost, apiDelete, toQueryString } from './client'
+import { apiGet, apiPost, apiDelete, apiPatch, toQueryString } from './client'
 import type { ExternalLocation } from '../types'
 
 // ── Response types ──────────────────────────────────────────────────────────
@@ -157,6 +157,22 @@ export function deleteBuilding(buildingId: string): Promise<{ success: true }> {
 
 export function deleteSite(siteId: string): Promise<{ success: true }> {
   return apiDelete(`/sites/${siteId}`)
+}
+
+export function updateSite(siteId: string, name: string): Promise<{ success: true; data: { id: string; name: string } }> {
+  return apiPatch(`/sites/${siteId}`, { name })
+}
+
+export function updateBuilding(buildingId: string, name: string): Promise<{ success: true; data: { id: string; name: string } }> {
+  return apiPatch(`/buildings/${buildingId}`, { name })
+}
+
+export function updateArea(areaId: string, code: string): Promise<{ success: true; data: { id: string; code: string } }> {
+  return apiPatch(`/areas/${areaId}`, { code })
+}
+
+export function updateExternalLocation(id: string, data: Partial<Omit<ExternalLocation, 'id'>>): Promise<{ success: true; data: ExternalLocation }> {
+  return apiPatch(`/external-locations/${id}`, data)
 }
 
 export interface LocationsFlatResponse {

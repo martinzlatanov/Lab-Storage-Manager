@@ -112,10 +112,10 @@ function NavGroup({ item, open, onToggle, onNavigate }: { item: NavItem; open: b
         onClick={onNavigate}
         className={({ isActive }) =>
           clsx(
-            'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+            'flex items-center gap-3 py-2 rounded-lg text-sm font-medium transition-all border-l-2 pl-[10px] pr-3',
             isActive
-              ? 'bg-blue-600 text-white'
-              : 'text-slate-300 hover:bg-slate-700/60 hover:text-white',
+              ? 'border-blue-500 bg-blue-500/10 text-blue-300'
+              : 'border-transparent text-slate-300 hover:bg-slate-700/50 hover:text-white',
           )
         }
       >
@@ -130,8 +130,8 @@ function NavGroup({ item, open, onToggle, onNavigate }: { item: NavItem; open: b
       <button
         onClick={onToggle}
         className={clsx(
-          'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer',
-          isActive ? 'text-white hover:bg-slate-700/40' : 'text-slate-400 hover:bg-slate-700/60 hover:text-white',
+          'w-full flex items-center gap-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer border-l-2 pl-[10px] pr-3',
+          isActive ? 'border-blue-500/50 text-white hover:bg-slate-700/40' : 'border-transparent text-slate-400 hover:bg-slate-700/60 hover:text-white',
         )}
       >
         {item.icon}
@@ -193,12 +193,12 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       {/* Logo */}
       <div className="px-4 py-5 border-b border-slate-800">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <FlaskConical size={16} className="text-white" />
+          <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/50">
+            <FlaskConical size={17} className="text-white" />
           </div>
           <div>
-            <p className="text-white font-semibold text-sm leading-tight">Lab Storage</p>
-            <p className="text-slate-500 text-xs leading-tight">Manager</p>
+            <p className="text-white font-semibold text-sm leading-tight tracking-tight">Lab Storage</p>
+            <p className="text-blue-500/60 text-xs leading-tight">Manager</p>
           </div>
         </div>
       </div>

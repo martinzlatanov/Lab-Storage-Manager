@@ -106,6 +106,7 @@ export function getReportAudit(
     siteId?: string
     from?: string
     to?: string
+    search?: string
     page?: number
     pageSize?: number
   } = {},

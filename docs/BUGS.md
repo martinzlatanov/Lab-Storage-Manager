@@ -9,7 +9,7 @@
 
 ### BUG-023 — Edit site / building / area saves nothing
 
-**Status:** Open
+**Status:** Open — backend endpoints now implemented; frontend wiring still missing
 **Scope:** Frontend (`pages/admin/AdminPages.tsx`, line 420–424)
 **Severity:** Critical — core admin functionality silently broken
 
@@ -21,56 +21,12 @@
 3. Change the name and click Save.
 4. Observe: the UI reverts to the original name. No error, no success feedback.
 
-**Expected:** Name is updated via `PUT /admin/sites/:id`, `PUT /admin/buildings/:id`, or `PUT /admin/areas/:id`.
-**Actual:** Silent no-op. Change is lost.
+**Backend endpoints (now available):**
+- `PATCH /sites/:id` — `{ name: string }`
+- `PATCH /buildings/:id` — `{ name: string }`
+- `PATCH /areas/:id` — `{ code: string }` (also cascades label updates to all child locations)
 
----
-
-### BUG-024 — Delete site only removes from UI state, never calls API
-
-**Status:** Open
-**Scope:** Frontend (`pages/admin/AdminPages.tsx`, line 559–562)
-**Severity:** Critical — data appears deleted but survives on the server
-
-**Description:** `handleDeleteSite()` contains a `TODO` comment (line 559) and only filters the site from local React state. No `DELETE /admin/sites/:id` API call is made. On page refresh the site reappears.
-
-**Steps to reproduce:**
-1. Admin → Location Config → expand any site → click the trash icon → confirm deletion.
-2. Refresh the page.
-3. Observe: the site is still present.
-
-**Expected:** Site deleted via API and removed from DB.
-**Actual:** Only removed from in-memory UI state; reappears on reload.
-
----
-
-### BUG-025 — "Invite User" button has no action
-
-**Status:** Open
-**Scope:** Frontend (`pages/admin/AdminPages.tsx`, line 149–153)
-**Severity:** High — user creation is completely unavailable in the UI
-
-**Description:** The "Invite User" button in User Management has no `onClick` handler and opens no modal, form, or navigation. Clicking it does nothing.
-
-**Expected:** Opens a form or dialog to create a new user account.
-**Actual:** No response.
-
----
-
-### BUG-026 — External Location "Save" button is a stub
-
-**Status:** Open
-**Scope:** Frontend (`pages/admin/AdminPages.tsx`, lines 1083–1124)
-**Severity:** High — external location creation is broken
-
-**Description:** The "New External Location" section contains a full form (name, contact, city, address, country, phone, email, notes) but the Save button has no `onClick` handler. Submitting the form does nothing — no API call is made, no state is updated.
-
-**Steps to reproduce:**
-1. Admin → External Locations → fill in all fields → click Save.
-2. Observe: nothing happens. The form is not cleared, no location is created.
-
-**Expected:** Calls `POST /external-locations` and adds the entry to the list.
-**Actual:** Silent no-op.
+**Remaining work:** Wire `saveEdit()` in `AdminPages.tsx` to call the appropriate PATCH endpoint, then update local state on success.
 
 ---
 
@@ -105,38 +61,6 @@
 
 ---
 
-### BUG-029 — Corrupted HTML in Move page Cancel link
-
-**Status:** Open
-**Scope:** Frontend (`pages/operations/OperationsPages.tsx`, line 502)
-**Severity:** High — visual corruption / broken button on Move page
-
-**Description:** The Cancel link on the Move operation page contains corrupted text inside the `className` attribute:
-
-```
-className="px-3 py-1.5 border border-slate-200 r || (!destLocationId && !destContainerId)ounded-lg text-sm …"
-```
-
-The string `r || (!destLocationId && !destContainerId)ounded-lg` is JavaScript expression residue embedded in a className string. This breaks the border-radius class (`rounded-lg`) and results in malformed Tailwind output.
-
-**Expected:** `className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm text-slate-700 hover:bg-slate-50"`
-**Actual:** Garbled class string; button renders without rounded corners and with garbage text leaked into the DOM.
-
----
-
-### BUG-030 — Move page Cancel button incorrectly uses `<Link>` to `/` instead of `navigate(-1)`
-
-**Status:** Open
-**Scope:** Frontend (`pages/operations/OperationsPages.tsx`, line 502)
-**Severity:** Medium — poor navigation UX; user loses context
-
-**Description:** All Cancel buttons on operation pages (Move, Temp Exit, Return, Scrap, Consume) link to `/` (dashboard). If the user navigated to the operation from an item detail page, Cancel does not return them to where they came from.
-
-**Expected:** Cancel navigates back to the previous page (e.g., item detail or operations hub).
-**Actual:** Cancel always redirects to the dashboard, losing navigation context.
-
----
-
 ### BUG-031 — Audit log search only filters already-loaded records
 
 **Status:** Open
@@ -147,50 +71,6 @@ The string `r || (!destLocationId && !destContainerId)ounded-lg` is JavaScript e
 
 **Expected:** Search input triggers `GET /operations?search=…` to filter server-side across all records.
 **Actual:** Only filters the records already in memory for the current page.
-
----
-
-### BUG-032 — Debug `console.log` statements left in location creation flow
-
-**Status:** Open
-**Scope:** Frontend (`pages/admin/AdminPages.tsx`, lines 485–499)
-**Severity:** Medium — exposes internal state in browser console
-
-**Description:** Five `console.log` / `console.error` calls remain in `doAddLocation()`:
-- Line 485: `📍 Creating location in area …`
-- Line 487: `✅ Location created successfully: …` (dumps full API response)
-- Line 488: `🔄 Updating local state…`
-- Line 499: `✅ Local state updated`
-- Line 502: `❌ Location creation failed: …` (dumps full error object)
-
-**Expected:** No debug output in the browser console in production.
-**Actual:** Every location creation logs implementation details to the console.
-
----
-
-### BUG-033 — Return operation allows submission without selecting a return location
-
-**Status:** Open
-**Scope:** Frontend (`pages/operations/OperationsPages.tsx`, ReturnPage)
-**Severity:** Medium — backend will reject the request with no clear UX explanation
-
-**Description:** The "Confirm Return" submit button is only disabled when no item is selected (`disabled={submitting || !selectedItem}`). It does not require a return location to be selected. The backend `POST /operations/return` endpoint requires a `locationId`. Submitting without one will fail at the API layer, but the user sees no preventive validation in the form.
-
-**Expected:** Submit button disabled unless both an item and a return location are selected. Inline validation message shown if location is missing.
-**Actual:** Form submits without location, fails silently at API, user receives no clear feedback.
-
----
-
-### BUG-034 — Item search in operation pages silently discards fetch errors
-
-**Status:** Open
-**Scope:** Frontend (`pages/operations/OperationsPages.tsx`, line ~393)
-**Severity:** Medium — user selects an item that fails to load with no feedback
-
-**Description:** After the user selects an item from search results, the page fetches full item details. If this fetch fails, the `.catch(() => {})` swallows the error — no error banner is shown, no state is cleared, and the form appears to have an item selected while it actually has incomplete data.
-
-**Expected:** On fetch error: clear the selected item, show an inline error message ("Failed to load item details — please try again").
-**Actual:** Silent failure. The UI may show partial/stale item data.
 
 ---
 
@@ -249,6 +129,42 @@ The string `r || (!destLocationId && !destContainerId)ounded-lg` is JavaScript e
 ## Resolved Issues
 
 All previously reported bugs (BUG-001 through BUG-020, excluding BUG-011) have been fixed. See [CHANGELOG.md](CHANGELOG.md) for details.
+
+### BUG-023 — Edit site / building / area saves nothing *(Fixed 2026-03-31)*
+
+**Fix:** Added `PATCH /sites/:siteId`, `PATCH /buildings/:buildingId`, `PATCH /areas/:areaId` backend routes. Area rename regenerates child location labels in a DB transaction. Frontend `saveEdit()` now calls the API; errors surface in the error banner.
+
+### BUG-024 — Delete site only removes from UI state *(Fixed — already in code)*
+
+**Fix:** `handleDeleteSite()` calls `deleteSite(siteId)` API and reloads the tree. Same for buildings and areas.
+
+### BUG-025 — "Invite User" button has no action *(Fixed — already in code)*
+
+**Fix:** Button calls `openInvite()` which opens a full modal wired to `POST /users`.
+
+### BUG-026 — External Location "Save" button is a stub *(Fixed 2026-03-31)*
+
+**Fix:** Form is now controlled with state. Save calls `POST /external-locations`. Edit button opens a modal wired to `PATCH /external-locations/:id`. List loads from API on mount.
+
+### BUG-029 — Corrupted HTML in Move page Cancel link *(Fixed — already in code)*
+
+**Fix:** Cancel button uses `onClick={() => navigate(-1)}` with correct `className`.
+
+### BUG-030 — Cancel buttons redirect to `/` instead of going back *(Fixed — already in code)*
+
+**Fix:** All Cancel buttons on operation pages use `navigate(-1)`.
+
+### BUG-032 — Debug console.log in location creation *(Fixed — already in code)*
+
+**Fix:** All console.log / console.error calls removed from `doAddLocation()`.
+
+### BUG-033 — Return allows submission without location *(Fixed — already in code)*
+
+**Fix:** Submit button disabled unless both item and `returnLocationId` are set.
+
+### BUG-034 — Item fetch errors silently discarded *(Fixed — already in code)*
+
+**Fix:** `.catch()` now clears `selectedItemId` and sets an error message.
 
 ### BUG-011 — Barcode silently set to labIdNumber *(Fixed — strategy resolved)*
 

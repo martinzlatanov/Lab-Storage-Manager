@@ -12,6 +12,8 @@ import {
   PackageOpen,
   ArrowRightLeft,
   Loader2,
+  Package,
+  MapPin,
 } from 'lucide-react'
 import { Card, CardHeader } from '../../components/ui/Card'
 import { OperationBadge } from '../../components/ui/StatusBadge'
@@ -181,30 +183,58 @@ export function DashboardPage() {
       {/* Summary cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="p-5">
-          <p className="text-slate-500 text-xs font-medium uppercase tracking-wide">Total Items</p>
-          <p className="text-3xl font-bold text-slate-900 mt-1">{stats.totalItems}</p>
-          <p className="text-slate-400 text-xs mt-1">across all sites</p>
-        </Card>
-
-        <Card className="p-5">
-          <p className="text-slate-500 text-xs font-medium uppercase tracking-wide">At External</p>
-          <p className="text-3xl font-bold text-yellow-600 mt-1">{stats.atExternalLocations}</p>
-          <div className="flex items-center gap-1 mt-1">
-            <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
-            <p className="text-red-500 text-xs">{stats.overdueReturns} overdue</p>
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-slate-500 text-xs font-medium uppercase tracking-widest">Total Items</p>
+              <p className="text-3xl font-bold text-slate-900 mt-2 font-mono">{stats.totalItems}</p>
+              <p className="text-slate-400 text-xs mt-1.5">across all sites</p>
+            </div>
+            <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+              <Package size={16} className="text-slate-500" />
+            </div>
           </div>
         </Card>
 
         <Card className="p-5">
-          <p className="text-slate-500 text-xs font-medium uppercase tracking-wide">Expiring Soon</p>
-          <p className="text-3xl font-bold text-orange-600 mt-1">{stats.expiringCount}</p>
-          <p className="text-slate-400 text-xs mt-1">within 30 days</p>
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-slate-500 text-xs font-medium uppercase tracking-widest">At External</p>
+              <p className="text-3xl font-bold text-yellow-600 mt-2 font-mono">{stats.atExternalLocations}</p>
+              <div className="flex items-center gap-1 mt-1.5">
+                <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
+                <p className="text-red-500 text-xs">{stats.overdueReturns} overdue</p>
+              </div>
+            </div>
+            <div className="w-9 h-9 rounded-xl bg-yellow-50 flex items-center justify-center shrink-0">
+              <MapPin size={16} className="text-yellow-600" />
+            </div>
+          </div>
         </Card>
 
         <Card className="p-5">
-          <p className="text-slate-500 text-xs font-medium uppercase tracking-wide">Recent Ops</p>
-          <p className="text-3xl font-bold text-blue-600 mt-1">{stats.recentOps.length}</p>
-          <p className="text-slate-400 text-xs mt-1">this week</p>
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-slate-500 text-xs font-medium uppercase tracking-widest">Expiring Soon</p>
+              <p className="text-3xl font-bold text-orange-600 mt-2 font-mono">{stats.expiringCount}</p>
+              <p className="text-slate-400 text-xs mt-1.5">within 30 days</p>
+            </div>
+            <div className="w-9 h-9 rounded-xl bg-orange-50 flex items-center justify-center shrink-0">
+              <Clock size={16} className="text-orange-500" />
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-5">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-slate-500 text-xs font-medium uppercase tracking-widest">Recent Ops</p>
+              <p className="text-3xl font-bold text-blue-600 mt-2 font-mono">{stats.recentOps.length}</p>
+              <p className="text-slate-400 text-xs mt-1.5">this week</p>
+            </div>
+            <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+              <ArrowRightLeft size={16} className="text-blue-600" />
+            </div>
+          </div>
         </Card>
       </div>
 
@@ -226,7 +256,7 @@ export function DashboardPage() {
               to={`/items?type=${type}`}
               className={`flex flex-col items-center gap-2 p-4 rounded-xl border ${bg} ${border} hover:shadow-md transition-shadow group`}
             >
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${bg}`}>
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-white/80 shadow-sm">
                 <Icon size={20} className={`${color} group-hover:scale-110 transition-transform`} />
               </div>
               <p className="text-2xl font-bold text-slate-800">{stats.byType[type] ?? 0}</p>

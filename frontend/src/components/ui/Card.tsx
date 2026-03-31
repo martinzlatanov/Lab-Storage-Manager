@@ -23,7 +23,7 @@ export function CardHeader({ title, subtitle, actions }: CardHeaderProps) {
   return (
     <div className="flex items-start justify-between px-5 py-4 border-b border-slate-100">
       <div>
-        <h2 className="text-sm font-semibold text-slate-800">{title}</h2>
+        <h2 className="text-sm font-semibold text-slate-800 tracking-tight">{title}</h2>
         {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
       </div>
       {actions && <div className="flex items-center gap-2">{actions}</div>}

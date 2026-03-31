@@ -8,7 +8,7 @@ export { getItems, getItem, getItemHistory, scanBarcode, createItem, updateItem 
 export type { ItemListParams, ItemListResponse, ItemDetailResponse, ItemHistoryResponse } from './items'
 export { getOperations, recordReceipt, recordMove, recordExit, recordReturn, recordScrap, recordConsume } from './operations'
 export type { OperationListParams, OperationListResponse, OperationResponse } from './operations'
-export { getSites, getSitesTree, getBuildings, getAreas, getLocationDetail, getExternalLocations, getLocationsFlat, createSite, createBuilding, createArea, createLocation, createExternalLocation, deleteLocation, deleteArea, deleteBuilding, deleteSite } from './sites'
+export { getSites, getSitesTree, getBuildings, getAreas, getLocationDetail, getExternalLocations, getLocationsFlat, createSite, createBuilding, createArea, createLocation, createExternalLocation, deleteLocation, deleteArea, deleteBuilding, deleteSite, updateSite, updateBuilding, updateArea, updateExternalLocation } from './sites'
 export type { SitesResponse, SitesTreeResponse, BuildingsResponse, AreasResponse, LocationDetailResponse, ExternalLocationsResponse, LocationsFlatResponse } from './sites'
 export { getReportByLocation, getReportExternal, getReportExpiry, getReportAudit } from './reports'
 export type { ByLocationReport, ExternalReport, ExpiryReport, ExpiryReportItem, AuditReport, AuditReportRecord } from './reports'

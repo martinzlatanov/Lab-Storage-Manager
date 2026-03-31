@@ -12,7 +12,7 @@
     min-height: 100vh;
     background-color: #f8fafc;
     color: #0f172a;
-    font-family: system-ui, -apple-system, sans-serif;
+    font-family: 'Barlow', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
 

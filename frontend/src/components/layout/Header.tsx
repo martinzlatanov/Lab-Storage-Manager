@@ -175,10 +175,10 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
         >
           <Menu size={20} />
         </button>
-        <h1 className="text-base font-semibold text-slate-800 flex-1">{title}</h1>
+        <h1 className="text-lg font-semibold text-slate-800 flex-1 tracking-tight">{title}</h1>
 
         {/* Quick scan / search */}
-        <div className="flex items-center gap-2 bg-slate-100 rounded-lg px-3 py-1.5 w-64 text-sm text-slate-500 cursor-pointer hover:bg-slate-200 transition-colors">
+        <div className="flex items-center gap-2 bg-slate-100 border border-slate-200 rounded-lg px-3 py-1.5 w-64 text-sm text-slate-500 cursor-pointer hover:bg-slate-200 hover:border-slate-300 transition-colors">
           <ScanLine size={15} className="text-slate-400" />
           <span className="flex-1 select-none">Scan or search…</span>
           <kbd className="text-xs bg-white border border-slate-300 px-1.5 py-0.5 rounded text-slate-400 font-mono">⌘K</kbd>
