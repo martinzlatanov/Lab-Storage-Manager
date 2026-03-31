@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Filter, Plus, ScanLine, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Card } from '../../components/ui/Card'
 import { ItemStatusBadge, ItemTypeBadge } from '../../components/ui/StatusBadge'
@@ -46,6 +46,9 @@ const COLUMNS: { field: SortField; label: string; defaultWidth: number }[] = [
 ]
 
 export function ItemListPage() {
+  const [searchParams] = useSearchParams()
+  const initialType = (searchParams.get('type') as ItemType | null) ?? ''
+
   const [items, setItems] = useState<AnyItem[]>(USE_MOCKS ? MOCK_ITEMS : [])
   const [loading, setLoading] = useState(!USE_MOCKS)
   const [error, setError] = useState('')
@@ -53,7 +56,7 @@ export function ItemListPage() {
   const [totalPages, setTotalPages] = useState(USE_MOCKS ? Math.ceil(MOCK_ITEMS.length / PAGE_SIZE) : 1)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
-  const [typeFilter, setTypeFilter] = useState<ItemType | ''>('')
+  const [typeFilter, setTypeFilter] = useState<ItemType | ''>(initialType)
   const [statusFilter, setStatusFilter] = useState<ItemStatus | ''>('')
   const [showScrapped, setShowScrapped] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)

@@ -8,6 +8,9 @@
 
 ## [2026-03-31]
 
+### Fixed
+- **Dashboard "Items by Type" widgets now filter the item list** (`frontend/src/pages/items/ItemListPage.tsx`): added `useSearchParams` to read the `?type=` query param on mount and initialize `typeFilter` from it, so clicking a type widget on the dashboard opens the items list pre-filtered to that type.
+
 ### Changed
 - **UI design refresh — typography, sidebar, dashboard** (`frontend/index.html`, `frontend/tailwind.config.js`, `frontend/src/index.css`, `frontend/src/components/layout/Sidebar.tsx`, `frontend/src/components/layout/Header.tsx`, `frontend/src/components/ui/Card.tsx`, `frontend/src/pages/dashboard/DashboardPage.tsx`):
   - Added **Barlow** (UI font) + **IBM Plex Mono** (data/numbers) via Google Fonts; replaced system-ui
