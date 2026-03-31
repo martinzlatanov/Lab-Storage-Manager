@@ -5,6 +5,30 @@
 
 ---
 
+## 2026-03-31 — PostgreSQL Data Volume: Host Bind-Mount at /var/storage
+
+**Decision:** Mount the PostgreSQL data directory from a fixed host path `/var/storage` instead of a named Docker volume.
+
+**Problem:** Named Docker volumes are ephemeral on Kubernetes — when a pod is rescheduled to a different node, or the node is restarted without persistent volume claims, data is lost. A bind-mount to a known host path makes the storage location predictable and independent of container/pod lifecycle.
+
+**Alternatives considered:**
+- Option A (chosen): Host bind-mount at `/var/storage` — simple, no extra tooling, works on any Linux host, path is known and can be backed up predictably
+- Option B: Kubernetes PersistentVolumeClaim — correct for production K8s but adds cluster-level configuration that is outside the scope of this on-premises deployment
+- Option C: Named Docker volume (previous setup) — convenient for local dev but unreliable when containers restart on a different node
+
+**Rationale:**
+- On-premises single-node Linux server; a bind-mount is the simplest and most reliable approach
+- `/var/storage` is a memorable, infra-owned path that can be on a dedicated data partition or NFS mount
+- Backup scripts can target `/var/storage` directly without needing to know Docker volume internals
+
+**Pre-condition for deployment:**
+```bash
+mkdir -p /var/storage
+chown 999:999 /var/storage  # postgres user inside the container
+```
+
+---
+
 ## 2026-03-31 — Dev Auth Bypass – Active for Frontend Integration Phase
 
 **Decision:** Keep dev auth bypass enabled during frontend integration phase. This allows rapid development iteration without LDAP or manual login on every page reload.

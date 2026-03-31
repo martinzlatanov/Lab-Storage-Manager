@@ -22,6 +22,8 @@ All parts must be locatable at any time. Every movement is tracked and recorded 
 - On-premises, Visteon corporate infrastructure
 - Preferred OS: Linux (server); Windows also supported
 - Accessed via web browser (Firefox, Chrome, Edge) and Android terminals with 2D scanners
+- **PostgreSQL data** is stored at `/var/storage` on the host (bind-mount) — survives container/pod restarts.
+  Pre-condition: `mkdir -p /var/storage && chown 999:999 /var/storage`
 
 ---
 
@@ -149,6 +151,8 @@ See `DECISIONS.md` for full log.
 - [x] **Dev auth bypass** — `DEV_AUTH=true` (backend) + `VITE_DEV_AUTO_LOGIN=true` (frontend) env flags; auto-login on mount, LDAP skipped in dev (ADC-12)
 - [x] **Delete location / area / building** — Admin-only DELETE endpoints with occupancy guard (blocked if any IN_STORAGE items or containers exist); cascades to child nodes; UI inline confirmation in Admin → Location Config
 - [x] **Dev auto-login session recovery** — `auth:session-expired` handler re-auto-logs in when `VITE_DEV_AUTO_LOGIN=true`, preventing redirect to login page on token expiry during development
+- [x] **Item list pagination** — 50 items/page with Prev/Next controls; real API uses server-side paging (`page`/`pageSize`); mock mode paginates client-side; filters reset to page 1
+- [x] **PostgreSQL bind-mount volume** — data stored at `/var/storage` on host; survives Kubernetes pod restarts
 
 ---
 

@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Filter, Plus, ScanLine, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown, Loader2 } from 'lucide-react'
+import { Filter, Plus, ScanLine, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Card } from '../../components/ui/Card'
 import { ItemStatusBadge, ItemTypeBadge } from '../../components/ui/StatusBadge'
 import { MOCK_ITEMS } from '../../mock/data'
@@ -9,6 +9,7 @@ import { getItems } from '../../api'
 import clsx from 'clsx'
 
 const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true'
+const PAGE_SIZE = 50
 
 function formatDate(iso: string) {
   return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(iso))
@@ -49,6 +50,8 @@ export function ItemListPage() {
   const [loading, setLoading] = useState(!USE_MOCKS)
   const [error, setError] = useState('')
   const [totalItems, setTotalItems] = useState(USE_MOCKS ? MOCK_ITEMS.length : 0)
+  const [totalPages, setTotalPages] = useState(USE_MOCKS ? Math.ceil(MOCK_ITEMS.length / PAGE_SIZE) : 1)
+  const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<ItemType | ''>('')
   const [statusFilter, setStatusFilter] = useState<ItemStatus | ''>('')
@@ -95,16 +98,18 @@ export function ItemListPage() {
         ...(typeFilter ? { itemType: typeFilter } : {}),
         ...(statusFilter ? { status: statusFilter } : {}),
         ...(search ? { search } : {}),
-        pageSize: 100,
+        page,
+        pageSize: PAGE_SIZE,
       })
       setItems(res.data)
       setTotalItems(res.meta.total)
+      setTotalPages(res.meta.totalPages)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load items')
     } finally {
       setLoading(false)
     }
-  }, [typeFilter, statusFilter, search])
+  }, [typeFilter, statusFilter, search, page])
 
   useEffect(() => { fetchItems() }, [fetchItems])
 
@@ -157,6 +162,22 @@ export function ItemListPage() {
     })
   }, [items, search, typeFilter, statusFilter, showScrapped, sortField, sortOrder])
 
+  // For mock mode: update total counts when filters change, and paginate client-side
+  useEffect(() => {
+    if (USE_MOCKS) {
+      setTotalItems(filteredAndSorted.length)
+      setTotalPages(Math.max(1, Math.ceil(filteredAndSorted.length / PAGE_SIZE)))
+      setPage(1)
+    }
+  }, [filteredAndSorted])
+
+  const pagedItems = useMemo(() => {
+    if (USE_MOCKS) {
+      return filteredAndSorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+    }
+    return filteredAndSorted
+  }, [filteredAndSorted, page])
+
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
@@ -164,6 +185,15 @@ export function ItemListPage() {
       setSortField(field)
       setSortOrder(field === 'updatedAt' ? 'desc' : 'asc')
     }
+  }
+
+  // Reset to page 1 when filters/search change (real API path)
+  const handleSearch = (v: string) => { setSearch(v); setPage(1) }
+  const handleTypeFilter = (v: ItemType | '') => { setTypeFilter(v); setPage(1) }
+  const handleStatusFilter = (v: ItemStatus | '') => {
+    setStatusFilter(v)
+    setPage(1)
+    if (v === ItemStatus.SCRAPPED) setShowScrapped(true)
   }
 
   function startResize(e: React.MouseEvent, colIndex: number) {
@@ -174,6 +204,9 @@ export function ItemListPage() {
     document.body.style.userSelect = 'none'
   }
 
+  const rangeStart = totalItems === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
+  const rangeEnd = Math.min(page * PAGE_SIZE, totalItems)
+
   return (
     <div className="space-y-2">
       {/* Toolbar */}
@@ -183,7 +216,7 @@ export function ItemListPage() {
           <input
             type="text"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleSearch(e.target.value)}
             placeholder="Search by Lab ID, name, location…"
             className="w-full bg-white border border-slate-200 rounded-lg pl-9 pr-3 py-1 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
@@ -194,7 +227,7 @@ export function ItemListPage() {
           <div className="relative">
             <select
               value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value as ItemType | '')}
+              onChange={(e) => handleTypeFilter(e.target.value as ItemType | '')}
               className="appearance-none bg-white border border-slate-200 rounded-lg pl-3 pr-7 py-1 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
               <option value="">All Types</option>
@@ -208,11 +241,7 @@ export function ItemListPage() {
           <div className="relative">
             <select
               value={statusFilter}
-              onChange={(e) => {
-                const val = e.target.value as ItemStatus | ''
-                setStatusFilter(val)
-                if (val === ItemStatus.SCRAPPED) setShowScrapped(true)
-              }}
+              onChange={(e) => handleStatusFilter(e.target.value as ItemStatus | '')}
               className="appearance-none bg-white border border-slate-200 rounded-lg pl-3 pr-7 py-1 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
               <option value="">All Statuses</option>
@@ -323,14 +352,14 @@ export function ItemListPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {filteredAndSorted.length === 0 ? (
+                  {pagedItems.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="text-center py-8 text-slate-400">
                         {error ? 'Failed to load items.' : 'No items match your search.'}
                       </td>
                     </tr>
                   ) : (
-                    filteredAndSorted.map((item) => {
+                    pagedItems.map((item) => {
                       const location = getItemLocation(item)
                       const isExternal = !!(item as any).externalLocationId || !!(item as any).externalLocationName
                       return (
@@ -374,9 +403,38 @@ export function ItemListPage() {
               </table>
             </div>
 
+            {/* Footer: count + pagination */}
             <div className="px-4 py-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-              <span>Showing {filteredAndSorted.length} of {totalItems} items</span>
-              <span className="text-slate-400">Scrapped items {showScrapped ? 'shown' : 'hidden'}</span>
+              <span>
+                {totalItems === 0
+                  ? 'No items'
+                  : `Showing ${rangeStart}–${rangeEnd} of ${totalItems} items`}
+                {!showScrapped && <span className="ml-2 text-slate-400">(scrapped hidden)</span>}
+              </span>
+
+              {totalPages > 1 && (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="p-1 rounded hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    aria-label="Previous page"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                  <span className="px-2 tabular-nums">
+                    {page} / {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                    className="p-1 rounded hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    aria-label="Next page"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+              )}
             </div>
           </>
         )}

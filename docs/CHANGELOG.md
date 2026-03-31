@@ -9,6 +9,17 @@
 ## [2026-03-31]
 
 ### Added
+- **Item list pagination** — `ItemListPage` now paginates at 50 items/page with Prev/Next controls and "Showing X–Y of Z items" footer.
+  - `frontend/src/pages/items/ItemListPage.tsx`: added `page`/`totalPages` state, `PAGE_SIZE = 50` constant, `pagedItems` memo for mock-mode client-side slicing, `handleSearch`/`handleTypeFilter`/`handleStatusFilter` wrappers that reset page to 1 on filter change, and pagination footer with ChevronLeft/ChevronRight buttons.
+  - Real API path passes `page` and `pageSize: 50` to `GET /items`; backend already supported `page`/`pageSize`/`totalPages` in its response meta.
+
+### Changed
+- **PostgreSQL data volume** — changed from a named Docker volume (`postgres_data`) to a host bind-mount at `/var/storage` so data persists at a known, stable path that survives Kubernetes pod/container restarts and node rescheduling.
+  - `docker-compose.yml`: `postgres_data:/var/lib/postgresql/data` → `/var/storage:/var/lib/postgresql/data`; removed the `volumes:` named-volume declaration at the bottom of the file.
+  - **Pre-condition:** the directory `/var/storage` must exist on the host with correct ownership (`chown 999:999 /var/storage` for the `postgres` user inside the container) before `docker compose up`.
+
+
+### Added
 - **Site deletion** — Sites can now be deleted from the Location Config page.
   - `frontend/src/pages/admin/AdminPages.tsx`: Added delete button (trash icon) next to each site name with inline confirmation dialog.
   - Delete button only appears when site is not being edited.
