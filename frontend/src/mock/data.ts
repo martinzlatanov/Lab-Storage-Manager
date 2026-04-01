@@ -256,7 +256,7 @@ export const MOCK_CONTAINERS: Container[] = [
   { id: 'c2', label: 'BOX-0002', barcode: 'BOX-0002', locationId: 'l2', locationLabel: 'A-01-01-2 (Sofia / Main)', storageAreaId: 'sa1', storageAreaCode: 'A', itemCount: 2 },
   { id: 'c3', label: 'BOX-0003', barcode: 'BOX-0003', locationId: 'l6', locationLabel: 'B-01-01-1 (Sofia / Main)', storageAreaId: 'sa2', storageAreaCode: 'B', notes: 'Spare parts mixed', itemCount: 7 },
   { id: 'c4', label: 'BOX-0004', barcode: 'BOX-0004', locationId: 'l9', locationLabel: 'C-01-01-1 (Sofia / Lab)', storageAreaId: 'sa3', storageAreaCode: 'C', itemCount: 1 },
-  { id: 'c5', label: 'BOX-0005', barcode: 'BOX-0005', externalLocationId: 'el1', notes: 'At BMW for testing', itemCount: 3 },
+  { id: 'c5', label: 'BOX-0005', barcode: 'BOX-0005', externalLocationId: 'el1', storageAreaId: 'sa5', storageAreaCode: 'A', notes: 'At BMW for testing', itemCount: 3 },
   { id: 'c6', label: 'BOX-0006', barcode: 'BOX-0006', locationId: 'l11', locationLabel: 'A-01-01-1 (Munich / Tech)', storageAreaId: 'sa4', storageAreaCode: 'A', itemCount: 5 },
 ]
 

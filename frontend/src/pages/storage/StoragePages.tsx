@@ -6,7 +6,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { UserRole } from '../../types'
+import { UserRole, type StorageArea } from '../../types'
 import {
   ChevronRight,
   MapPin,
@@ -300,14 +300,39 @@ function AddContainerModal({ onClose, onCreated }: AddContainerModalProps) {
   const [storageAreaId, setStorageAreaId] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [allAreas, setAllAreas] = useState<Array<{ id: string; label: string }>>([])
+  const [loadingAreas, setLoadingAreas] = useState(!USE_MOCKS)
   const labelRef = useRef<HTMLInputElement>(null)
 
-  // Derive all areas from mock sites or API
-  const allAreas = USE_MOCKS
-    ? MOCK_SITES.flatMap(s => s.buildings.flatMap(b =>
-        b.storageAreas.map(a => ({ id: a.id, label: `${s.name} / ${b.name} / Area ${a.code}` }))
-      ))
-    : []
+  // Load all areas from mock sites or API
+  useEffect(() => {
+    if (USE_MOCKS) {
+      setAllAreas(
+        MOCK_SITES.flatMap(s => s.buildings.flatMap(b =>
+          b.storageAreas.map(a => ({ id: a.id, label: `${s.name} / ${b.name} / Area ${a.code}` }))
+        ))
+      )
+      setLoadingAreas(false)
+      return
+    }
+
+    const loadAreas = async () => {
+      try {
+        const res = await apiGetSitesTree()
+        const areas: Array<{ id: string; label: string }> = res.data.flatMap(s =>
+          s.buildings.flatMap(b =>
+            b.storageAreas.map(a => ({ id: a.id, label: `${s.name} / ${b.name} / Area ${a.code}` }))
+          )
+        )
+        setAllAreas(areas)
+      } catch {
+        setError('Failed to load storage areas.')
+      } finally {
+        setLoadingAreas(false)
+      }
+    }
+    loadAreas()
+  }, [])
 
   useEffect(() => { labelRef.current?.focus() }, [])
 
@@ -320,6 +345,7 @@ function AddContainerModal({ onClose, onCreated }: AddContainerModalProps) {
     e.preventDefault()
     if (!label.trim()) { setError('Label is required.'); return }
     if (!barcode.trim()) { setError('Barcode is required.'); return }
+    if (!storageAreaId.trim()) { setError('Storage Area is required.'); return }
 
     setSaving(true)
     setError(null)
@@ -410,14 +436,15 @@ function AddContainerModal({ onClose, onCreated }: AddContainerModalProps) {
           {/* Storage Area */}
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1">
-              Storage Area <span className="text-slate-400">(optional)</span>
+              Storage Area <span className="text-red-500">*</span>
             </label>
             <select
               value={storageAreaId}
               onChange={e => setStorageAreaId(e.target.value)}
-              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+              disabled={loadingAreas}
+              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white disabled:bg-slate-50 disabled:text-slate-400"
             >
-              <option value="">— No area assigned —</option>
+              <option value="">{loadingAreas ? '— Loading areas… —' : '— Select a storage area —'}</option>
               {allAreas.map(a => (
                 <option key={a.id} value={a.id}>{a.label}</option>
               ))}

@@ -8,7 +8,18 @@
 
 ## [2026-04-01]
 
+### Changed
+- **Storage Area field now mandatory in Container creation** (`frontend/src/pages/storage/StoragePages.tsx`): 
+  - Changed the "Storage Area" dropdown label from "(optional)" to "*" (required).
+  - Implemented loading of storage areas from the API (`getSitesTree()`) instead of an empty list.
+  - Added client-side validation: form submission now fails with error message if no storage area is selected.
+  - Added loading state while areas are being fetched from the API.
+
 ### Fixed
+- **All existing containers now have assigned storage areas** (`frontend/src/mock/data.ts`, `backend/prisma/migrations/20260401000001_populate_container_storage_areas/migration.sql`):
+  - Updated mock data: BOX-0005 (c5) now has `storageAreaId: 'sa5'` assigned (was missing).
+  - Created database migration to backfill `NULL` storage area IDs for all containers with a random area assignment, ensuring data consistency across all containers.
+
 - **`prisma` CLI missing in production Docker image** (`backend/package.json`): Moved `prisma` from `devDependencies` to `dependencies` so it is included when the runner stage runs `npm ci --omit=dev`. Without it, `npx prisma migrate deploy` at container startup could not find the CLI, causing `P1001: Can't reach database server at postgres:5432`.
 
 ### Fixed
