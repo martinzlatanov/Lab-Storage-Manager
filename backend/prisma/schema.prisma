@@ -135,7 +135,8 @@ model StorageArea {
   building   Building        @relation(fields: [buildingId], references: [id])
   createdAt  DateTime        @default(now())
 
-  locations StorageLocation[]
+  locations  StorageLocation[]
+  containers Container[]
 
   @@unique([buildingId, code])               // same code can exist in different buildings
 }
@@ -192,6 +193,8 @@ model Container {
   // A container is either at an internal location or an external one
   locationId         String?
   location           StorageLocation? @relation(fields: [locationId], references: [id])
+  storageAreaId      String?
+  storageArea        StorageArea?     @relation(fields: [storageAreaId], references: [id])
   externalLocationId String?
   externalLocation   ExternalLocation? @relation(fields: [externalLocationId], references: [id])
 

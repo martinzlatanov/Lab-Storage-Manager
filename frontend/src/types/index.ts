@@ -117,6 +117,8 @@ export interface Container {
   barcode: string
   locationId?: string
   locationLabel?: string
+  storageAreaId?: string
+  storageAreaCode?: string
   externalLocationId?: string
   notes?: string
   itemCount?: number

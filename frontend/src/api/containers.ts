@@ -13,6 +13,8 @@ export interface ContainerResponse {
     notes?: string
     locationId?: string
     externalLocationId?: string
+    storageAreaId?: string
+    storageArea?: { id: string; code: string }
     location?: { id: string; label: string }
     items?: Array<Record<string, unknown>>
   }
@@ -38,6 +40,7 @@ export function createContainer(data: {
   label: string
   notes?: string
   locationId?: string
+  storageAreaId?: string
   externalLocationId?: string
 }): Promise<ContainerResponse> {
   return apiPost<ContainerResponse>('/containers', data)
@@ -45,9 +48,10 @@ export function createContainer(data: {
 
 export function updateContainer(id: string, data: {
   label?: string
-  notes?: string
-  locationId?: string
-  externalLocationId?: string
+  notes?: string | null
+  locationId?: string | null
+  storageAreaId?: string | null
+  externalLocationId?: string | null
 }): Promise<ContainerResponse> {
   return apiPatch<ContainerResponse>(`/containers/${id}`, data)
 }

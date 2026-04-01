@@ -23,8 +23,10 @@
 | [docs/BUGS.md](docs/BUGS.md) | All identified and known bugs — only open ones |
 | [docs/CHANGELOG.md](docs/CHANGELOG.md) | To understand what has been done and what is planned | Updated with every code change, excluding minor ones |
 
+**Add under a top-level ## Documentation section near the top of CLAUDE.md\n\nAfter ANY code changes, always update CHANGELOG.md, BUGS.md, and all relevant .md documentation files without being asked.**
 
 **Always read the relevant doc(s) before writing code. Do not rely on memory alone.**
+
 
 ---
 
@@ -36,6 +38,7 @@
 - Use standard sections: `### Added`, `### Changed`, `### Fixed`, `### Decided` as appropriate.
 - Include the file(s) changed and a concise description of what changed and why.
 - Do not wait to be asked. This is not optional.
+
 
 ---
 
@@ -150,6 +153,20 @@ Site (e.g. Sofia, Munich, Paris)
 - **Items are never deleted.** Scrapped items become read-only in the UI (admin-only override).
 - **Users are never deleted.** Only flagged `isActive: false`.
 - **Every operation is timestamped** and attributed to a user — full audit trail forever.
+
+---
+
+## BUG fixing workflow
+
+
+- ** When fixing bugs from BUGS.md, work through them systematically one at a time, verify each fix compiles/builds, and update BUGS.md status after each fix before moving to the next.**
+
+---
+
+##  Development Server
+
+
+- ** When starting or restarting dev servers, always check for stale processes on the target port first (`lsof -i :<port>` or equivalent) and kill them before starting a new instance. Never run servers in the background without confirming they stay up.**
 
 ---
 

@@ -88,12 +88,17 @@ Non-specific parts with fewer attributes. Exact attribute set TBD during impleme
 Site (city: Paris, Munich, Sofia…)
 └── Building (Main building, Lab building…)
     └── Storage Area (letter code: A, B, C…)
+        ├── Container (box, directly assigned to area)
+        │    └── Item (stored in container)
         └── Location: [Area]-[Row]-[Shelf]-[Level]
             Example: A-01-02-5
             = Storage area A, row 01, shelf 02, level 5
+            └── Item (stored directly at location, no container)
 ```
 
 **Namespace rule:** Site + Building form the unique namespace. The same area code (e.g. A-01-02-5) can exist in multiple buildings/sites and must be handled correctly in DB and UI.
+
+**Container Placement:** A container is directly assigned to a `StorageArea` (coarse placement). Optionally, it can be placed at a specific `Location` (shelf/row/level) within that area. If both `storageAreaId` and `locationId` are set, the location must belong to the assigned area.
 
 **External Locations:** External labs or R&D centers. When a part is shipped there it is a temporary exit. Must store: contact person, city, address.
 

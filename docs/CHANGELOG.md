@@ -52,6 +52,14 @@
 - **Backend debug logs removed** (`backend/src/routes/sites.ts`): Removed 12 debug `console.log`/`console.error` statements left in `POST /areas/:areaId/locations` and `GET /locations` handlers.
 
 ### Added
+- **Direct `storageAreaId` relationship on Container** (`backend/prisma/schema.prisma`, `backend/prisma/migrations/20260401000000_container_area_relation/migration.sql`, `backend/src/routes/containers.ts`, `frontend/src/types/index.ts`, `frontend/src/api/containers.ts`, `frontend/src/pages/storage/StoragePages.tsx`, `frontend/src/mock/data.ts`, `docs/SPEC.md`, `docs/TYPES.md`, `docs/API.md`):
+  - Containers are now direct children of StorageArea, enabling area-level filtering and optional fine-grain shelf placement via `locationId`.
+  - **Schema**: Added `storageAreaId` FK + `storageArea` relation to `Container`; added `containers` back-relation to `StorageArea`.
+  - **Migration**: Backfills `storageAreaId` from existing `locationId → StorageLocation.storageAreaId`, adds FK + index.
+  - **Backend**: All container endpoints accept `storageAreaId`. Auto-derives area from location when only `locationId` provided. Validates consistency between `storageAreaId` and `locationId` (400 if mismatch). Enforces mutual exclusivity: `storageAreaId` XOR `externalLocationId`.
+  - **Frontend**: Container type gains `storageAreaId` and `storageAreaCode` fields. `ContainerManagerPage` shows area code as fallback label. `AddContainerModal` has optional area selector dropdown populated from site/building/area hierarchy.
+  - **Documentation**: Updated hierarchy diagrams and API specs to reflect new ownership model.
+
 - **`docker-compose.dev.yml`** — single-command dev stack with auth fully bypassed: `DEV_AUTH=true` on backend (skips LDAP, accepts any credentials, auto-creates ADMIN user), `VITE_DEV_AUTO_LOGIN=true` on frontend (skips login form entirely). Run with `docker compose -f docker-compose.dev.yml up --build`.
 - **Frontend Dockerfile** — added `ARG`/`ENV` support for `VITE_DEV_AUTO_LOGIN`, `VITE_DEV_USERNAME`, `VITE_DEV_PASSWORD` so Vite bakes them into the bundle at build time.
 

@@ -206,16 +206,24 @@ export interface ExternalLocation {
 ```typescript
 export interface Container {
   id: string;
-  barcode: string;        // unique barcode value
-  label: string;          // human-readable label + barcode value
-  locationId?: string;    // null if at external location
-  externalLocationId?: string;
+  barcode: string;        // unique barcode value (Code 128)
+  label: string;          // human-readable label (e.g. BOX-0001)
+  storageAreaId?: string; // direct link to StorageArea (required for internal containers)
+  locationId?: string;    // optional specific shelf within storageAreaId
+  externalLocationId?: string; // set when container is at an external location
   notes?: string;
   createdAt: Date;
   updatedAt: Date;
   createdById: string;
 }
 ```
+
+**Business Rules:**
+- **Internal containers**: `storageAreaId` is required; `locationId` is optional and must belong to the same area if provided.
+- **External containers**: `externalLocationId` is set; `storageAreaId` must be null.
+- **Auto-derivation**: When only `locationId` is provided, `storageAreaId` is auto-derived from the location's parent area.
+- **Mutual exclusivity**: `storageAreaId` and `externalLocationId` cannot both be set.
+- **Immutability**: Containers are never deleted; only operational moves are recorded.
 
 ---
 

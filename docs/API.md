@@ -74,7 +74,27 @@
 | GET | `/containers` | All | List containers (filterable) | ✅ |
 | POST | `/containers` | User, Admin | Create container | ✅ |
 | GET | `/containers/:id` | All | Get container + contents | ✅ |
-| PATCH | `/containers/:id` | User, Admin | Update container (location, label) | ✅ |
+| PATCH | `/containers/:id` | User, Admin | Update container (location, label, area) | ✅ |
+
+**Container Endpoints — Request/Response Fields:**
+
+- **GET /containers** query params: `locationId`, `storageAreaId`, `externalLocationId`, `search`, `page`, `pageSize`
+  - `storageAreaId`: Filter containers by storage area
+  
+- **POST /containers** request body:
+  ```json
+  {
+    "barcode": "BOX-0007",
+    "label": "BOX-0007",
+    "notes": "optional notes",
+    "storageAreaId": "optional — direct area assignment",
+    "locationId": "optional — specific shelf within area",
+    "externalLocationId": "optional — external location (mutually exclusive with storageAreaId)"
+  }
+  ```
+  **Auto-derivation:** If only `locationId` is provided (no explicit `storageAreaId`), the backend derives `storageAreaId` from the location's parent area. If both are provided, they must be consistent (error: 400 if mismatch).
+
+- **PATCH /containers/:id** request body: Same fields as POST, all optional. Setting `externalLocationId` clears `storageAreaId` and `locationId`.
 
 ---
 

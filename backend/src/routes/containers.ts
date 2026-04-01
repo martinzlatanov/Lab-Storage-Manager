@@ -9,24 +9,33 @@ const CreateContainerBody = z.object({
   label: z.string().min(1).max(200),
   notes: z.string().optional(),
   locationId: z.string().optional(),
+  storageAreaId: z.string().optional(),
   externalLocationId: z.string().optional(),
 }).refine(
   (data) => !(data.locationId && data.externalLocationId),
   { message: "A container cannot be at both an internal and external location" }
+).refine(
+  (data) => !(data.storageAreaId && data.externalLocationId),
+  { message: "A container cannot have both a storage area and an external location" }
 );
 
 const UpdateContainerBody = z.object({
   label: z.string().min(1).max(200).optional(),
   notes: z.string().nullable().optional(),
   locationId: z.string().nullable().optional(),
+  storageAreaId: z.string().nullable().optional(),
   externalLocationId: z.string().nullable().optional(),
 }).refine(
   (data) => !(data.locationId && data.externalLocationId),
   { message: "A container cannot be at both an internal and external location" }
+).refine(
+  (data) => !(data.storageAreaId && data.externalLocationId),
+  { message: "A container cannot have both a storage area and an external location" }
 );
 
 const ListContainersQuery = z.object({
   locationId: z.string().optional(),
+  storageAreaId: z.string().optional(),
   externalLocationId: z.string().optional(),
   search: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),
@@ -46,11 +55,12 @@ export default async function containersRoutes(app: FastifyInstance) {
         return reply.status(400).send({ success: false, error: "Invalid query parameters" });
       }
 
-      const { locationId, externalLocationId, search, page, pageSize } = query.data;
+      const { locationId, storageAreaId, externalLocationId, search, page, pageSize } = query.data;
       const skip = (page - 1) * pageSize;
 
       const where = {
         ...(locationId ? { locationId } : {}),
+        ...(storageAreaId ? { storageAreaId } : {}),
         ...(externalLocationId ? { externalLocationId } : {}),
         ...(search
           ? {
@@ -69,6 +79,9 @@ export default async function containersRoutes(app: FastifyInstance) {
           take: pageSize,
           orderBy: { createdAt: "desc" },
           include: {
+            storageArea: {
+              include: { building: { include: { site: true } } },
+            },
             location: {
               include: { storageArea: { include: { building: { include: { site: true } } } } },
             },
@@ -97,7 +110,7 @@ export default async function containersRoutes(app: FastifyInstance) {
         return reply.status(400).send({ success: false, error: body.error.issues[0]?.message ?? "Invalid request body" });
       }
 
-      const { barcode, label, notes, locationId, externalLocationId } = body.data;
+      const { barcode, label, notes, locationId, storageAreaId, externalLocationId } = body.data;
 
       // Check barcode uniqueness
       const existing = await prisma.container.findUnique({ where: { barcode } });
@@ -105,11 +118,31 @@ export default async function containersRoutes(app: FastifyInstance) {
         return reply.status(409).send({ success: false, error: "A container with this barcode already exists" });
       }
 
-      // Validate referenced location exists
+      // Validate and resolve storageAreaId
+      let resolvedAreaId: string | null | undefined = storageAreaId ?? undefined;
+
       if (locationId) {
         const location = await prisma.storageLocation.findUnique({ where: { id: locationId } });
         if (!location) {
           return reply.status(404).send({ success: false, error: "Storage location not found" });
+        }
+        // Auto-derive area from location if not explicitly provided
+        if (!resolvedAreaId) {
+          resolvedAreaId = location.storageAreaId;
+        } else if (resolvedAreaId !== location.storageAreaId) {
+          // Explicit area provided but it doesn't match the location's area — reject
+          return reply.status(400).send({
+            success: false,
+            error: "storageAreaId does not match the area of the provided locationId",
+          });
+        }
+      }
+
+      if (resolvedAreaId && !locationId) {
+        // Validate the area exists when only area is provided (no location)
+        const area = await prisma.storageArea.findUnique({ where: { id: resolvedAreaId } });
+        if (!area) {
+          return reply.status(404).send({ success: false, error: "Storage area not found" });
         }
       }
 
@@ -118,11 +151,14 @@ export default async function containersRoutes(app: FastifyInstance) {
         if (!extLocation) {
           return reply.status(404).send({ success: false, error: "External location not found" });
         }
+        // External containers must not have area
+        resolvedAreaId = null;
       }
 
       const container = await prisma.container.create({
-        data: { barcode, label, notes, locationId, externalLocationId },
+        data: { barcode, label, notes, locationId, storageAreaId: resolvedAreaId ?? null, externalLocationId },
         include: {
+          storageArea: true,
           location: true,
           externalLocation: true,
           _count: { select: { items: true } },
@@ -144,6 +180,9 @@ export default async function containersRoutes(app: FastifyInstance) {
       const container = await prisma.container.findUnique({
         where: { barcode },
         include: {
+          storageArea: {
+            include: { building: { include: { site: true } } },
+          },
           location: {
             include: { storageArea: { include: { building: { include: { site: true } } } } },
           },
@@ -170,6 +209,9 @@ export default async function containersRoutes(app: FastifyInstance) {
       const container = await prisma.container.findUnique({
         where: { id },
         include: {
+          storageArea: {
+            include: { building: { include: { site: true } } },
+          },
           location: {
             include: { storageArea: { include: { building: { include: { site: true } } } } },
           },
@@ -216,13 +258,29 @@ export default async function containersRoutes(app: FastifyInstance) {
         return reply.status(404).send({ success: false, error: "Container not found" });
       }
 
-      const { label, notes, locationId, externalLocationId } = body.data;
+      const { label, notes, locationId, storageAreaId, externalLocationId } = body.data;
 
-      // Validate referenced location exists when setting a new one
+      let resolvedAreaId: string | null | undefined = storageAreaId;
+
       if (locationId) {
         const location = await prisma.storageLocation.findUnique({ where: { id: locationId } });
         if (!location) {
           return reply.status(404).send({ success: false, error: "Storage location not found" });
+        }
+        if (resolvedAreaId === undefined || resolvedAreaId === null) {
+          resolvedAreaId = location.storageAreaId;  // auto-derive
+        } else if (resolvedAreaId !== location.storageAreaId) {
+          return reply.status(400).send({
+            success: false,
+            error: "storageAreaId does not match the area of the provided locationId",
+          });
+        }
+      }
+
+      if (resolvedAreaId && resolvedAreaId !== null && !locationId) {
+        const area = await prisma.storageArea.findUnique({ where: { id: resolvedAreaId } });
+        if (!area) {
+          return reply.status(404).send({ success: false, error: "Storage area not found" });
         }
       }
 
@@ -239,12 +297,19 @@ export default async function containersRoutes(app: FastifyInstance) {
           ...(label !== undefined ? { label } : {}),
           ...(notes !== undefined ? { notes } : {}),
           ...(locationId !== undefined ? { locationId } : {}),
+          ...(resolvedAreaId !== undefined ? { storageAreaId: resolvedAreaId } : {}),
           ...(externalLocationId !== undefined ? { externalLocationId } : {}),
-          // Mutually exclusive: setting one clears the other
-          ...(locationId ? { externalLocationId: null } : {}),
-          ...(externalLocationId ? { locationId: null } : {}),
+          // Mutually exclusive: setting external clears internal fields
+          ...(externalLocationId ? { locationId: null, storageAreaId: null } : {}),
+          // Setting a location/area clears external
+          ...(locationId || (resolvedAreaId && resolvedAreaId !== null)
+            ? { externalLocationId: null }
+            : {}),
         },
         include: {
+          storageArea: {
+            include: { building: { include: { site: true } } },
+          },
           location: {
             include: { storageArea: { include: { building: { include: { site: true } } } } },
           },

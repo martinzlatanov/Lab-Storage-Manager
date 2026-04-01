@@ -297,9 +297,17 @@ function AddContainerModal({ onClose, onCreated }: AddContainerModalProps) {
   const [barcode, setBarcode] = useState('')
   const [notes, setNotes] = useState('')
   const [barcodeManual, setBarcodeManual] = useState(false)
+  const [storageAreaId, setStorageAreaId] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const labelRef = useRef<HTMLInputElement>(null)
+
+  // Derive all areas from mock sites or API
+  const allAreas = USE_MOCKS
+    ? MOCK_SITES.flatMap(s => s.buildings.flatMap(b =>
+        b.storageAreas.map(a => ({ id: a.id, label: `${s.name} / ${b.name} / Area ${a.code}` }))
+      ))
+    : []
 
   useEffect(() => { labelRef.current?.focus() }, [])
 
@@ -323,6 +331,7 @@ function AddContainerModal({ onClose, onCreated }: AddContainerModalProps) {
         barcode: barcode.trim(),
         label: label.trim(),
         notes: notes.trim() || undefined,
+        storageAreaId: storageAreaId || undefined,
       }
       onCreated(newContainer)
       return
@@ -333,6 +342,7 @@ function AddContainerModal({ onClose, onCreated }: AddContainerModalProps) {
         barcode: barcode.trim(),
         label: label.trim(),
         notes: notes.trim() || undefined,
+        storageAreaId: storageAreaId || undefined,
       })
       onCreated(res.data as unknown as Container)
     } catch (err) {
@@ -395,6 +405,23 @@ function AddContainerModal({ onClose, onCreated }: AddContainerModalProps) {
               rows={2}
               className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
             />
+          </div>
+
+          {/* Storage Area */}
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">
+              Storage Area <span className="text-slate-400">(optional)</span>
+            </label>
+            <select
+              value={storageAreaId}
+              onChange={e => setStorageAreaId(e.target.value)}
+              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+            >
+              <option value="">— No area assigned —</option>
+              {allAreas.map(a => (
+                <option key={a.id} value={a.id}>{a.label}</option>
+              ))}
+            </select>
           </div>
 
           {error && (
@@ -489,6 +516,11 @@ export function ContainerManagerPage() {
           const items = allItems.filter(i => i.containerId === container.id)
           const isExternal = !!container.externalLocationId
           const locLabel = (container as any).location?.label ?? container.locationLabel ?? ''
+          const areaDisplay = container.storageAreaCode
+            ? `Area ${container.storageAreaCode}`
+            : (container as any).storageArea?.code
+              ? `Area ${(container as any).storageArea.code}`
+              : null
 
           return (
             <Card key={container.id} className="p-3">
@@ -505,7 +537,11 @@ export function ContainerManagerPage() {
                     <p className="text-xs text-slate-500 mt-0.5">
                       {isExternal
                         ? <span className="text-yellow-600 flex items-center gap-1"><ExtLink size={10} /> External</span>
-                        : locLabel}
+                        : locLabel
+                          ? locLabel
+                          : areaDisplay
+                            ? areaDisplay
+                            : <span className="text-slate-300 italic">No location</span>}
                     </p>
                   </div>
                 </div>
