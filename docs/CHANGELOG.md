@@ -9,6 +9,9 @@
 ## [2026-04-01]
 
 ### Fixed
+- **`prisma` CLI missing in production Docker image** (`backend/package.json`): Moved `prisma` from `devDependencies` to `dependencies` so it is included when the runner stage runs `npm ci --omit=dev`. Without it, `npx prisma migrate deploy` at container startup could not find the CLI, causing `P1001: Can't reach database server at postgres:5432`.
+
+### Fixed
 - **Prisma OpenSSL error on Alpine Docker** (`backend/Dockerfile`, `backend/prisma/schema.prisma`): Added `binaryTargets = ["native", "linux-musl-openssl-3.0.x"]` to the Prisma generator so the correct engine binary is compiled for Alpine (musl libc). Added `RUN apk add --no-cache openssl` to the runner stage so the library is available at runtime. Resolves `Could not parse schema engine response` crash on container startup.
 
 ### Fixed
