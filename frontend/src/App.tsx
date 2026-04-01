@@ -1,5 +1,12 @@
 import { Component, type ReactNode, useEffect } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import {
+  createBrowserRouter,
+  createRoutesFromElements,
+  Navigate,
+  Route,
+  RouterProvider,
+  useNavigate,
+} from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { UserRole } from './types'
 
@@ -93,58 +100,62 @@ function AdminRoute({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
+const router = createBrowserRouter(
+  createRoutesFromElements(
+    <>
+      {/* Public */}
+      <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
+
+      {/* App shell wraps all authenticated routes */}
+      <Route element={<ProtectedRoute><ErrorBoundary><AppShell /></ErrorBoundary></ProtectedRoute>}>
+        <Route path="/" element={<DashboardPage />} />
+
+        {/* Items */}
+        <Route path="/items" element={<ItemListPage />} />
+        <Route path="/items/new/:type" element={<AddItemPage />} />
+        <Route path="/items/:id/edit" element={<EditItemPage />} />
+        <Route path="/items/:id/history" element={<ItemOperationHistoryPage />} />
+        <Route path="/items/:id" element={<ItemDetailPage />} />
+
+        {/* Operations */}
+        <Route path="/operations/receipt" element={<ReceiptPage />} />
+        <Route path="/operations/move" element={<MovePage />} />
+        <Route path="/operations/exit" element={<ExitPage />} />
+        <Route path="/operations/return" element={<ReturnPage />} />
+        <Route path="/operations/scrap" element={<ScrapPage />} />
+        <Route path="/operations/consume" element={<ConsumePage />} />
+
+        {/* Storage */}
+        <Route path="/storage/locations" element={<LocationBrowserPage />} />
+        <Route path="/storage/containers" element={<ContainerManagerPage />} />
+        <Route path="/storage/external" element={<ExternalLocationsPage />} />
+
+        {/* Labels */}
+        <Route path="/labels" element={<LabelsPage />} />
+
+        {/* Reports */}
+        <Route path="/reports/by-location" element={<ItemsByLocationPage />} />
+        <Route path="/reports/external" element={<ExternalReportPage />} />
+        <Route path="/reports/expiry" element={<ExpiryReportPage />} />
+        <Route path="/reports/audit" element={<AuditLogPage />} />
+
+        {/* Admin */}
+        <Route path="/admin/users" element={<AdminRoute><UserManagementPage /></AdminRoute>} />
+        <Route path="/admin/locations" element={<AdminRoute><LocationConfigPage /></AdminRoute>} />
+        <Route path="/admin/external-locations" element={<AdminRoute><ExternalLocationAdminPage /></AdminRoute>} />
+        <Route path="/admin/settings" element={<AdminRoute><SystemSettingsPage /></AdminRoute>} />
+
+        {/* Fallback — 404 */}
+        <Route path="*" element={<NotFoundPage />} />
+      </Route>
+    </>,
+  ),
+)
+
 export default function App() {
   return (
     <AuthProvider>
-    <BrowserRouter>
-      <Routes>
-        {/* Public */}
-        <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
-
-        {/* App shell wraps all authenticated routes */}
-        <Route element={<ProtectedRoute><ErrorBoundary><AppShell /></ErrorBoundary></ProtectedRoute>}>
-          <Route path="/" element={<DashboardPage />} />
-
-          {/* Items */}
-          <Route path="/items" element={<ItemListPage />} />
-          <Route path="/items/new/:type" element={<AddItemPage />} />
-          <Route path="/items/:id/edit" element={<EditItemPage />} />
-          <Route path="/items/:id/history" element={<ItemOperationHistoryPage />} />
-          <Route path="/items/:id" element={<ItemDetailPage />} />
-
-          {/* Operations */}
-          <Route path="/operations/receipt" element={<ReceiptPage />} />
-          <Route path="/operations/move" element={<MovePage />} />
-          <Route path="/operations/exit" element={<ExitPage />} />
-          <Route path="/operations/return" element={<ReturnPage />} />
-          <Route path="/operations/scrap" element={<ScrapPage />} />
-          <Route path="/operations/consume" element={<ConsumePage />} />
-
-          {/* Storage */}
-          <Route path="/storage/locations" element={<LocationBrowserPage />} />
-          <Route path="/storage/containers" element={<ContainerManagerPage />} />
-          <Route path="/storage/external" element={<ExternalLocationsPage />} />
-
-          {/* Labels */}
-          <Route path="/labels" element={<LabelsPage />} />
-
-          {/* Reports */}
-          <Route path="/reports/by-location" element={<ItemsByLocationPage />} />
-          <Route path="/reports/external" element={<ExternalReportPage />} />
-          <Route path="/reports/expiry" element={<ExpiryReportPage />} />
-          <Route path="/reports/audit" element={<AuditLogPage />} />
-
-          {/* Admin */}
-          <Route path="/admin/users" element={<AdminRoute><UserManagementPage /></AdminRoute>} />
-          <Route path="/admin/locations" element={<AdminRoute><LocationConfigPage /></AdminRoute>} />
-          <Route path="/admin/external-locations" element={<AdminRoute><ExternalLocationAdminPage /></AdminRoute>} />
-          <Route path="/admin/settings" element={<AdminRoute><SystemSettingsPage /></AdminRoute>} />
-
-          {/* Fallback — 404 */}
-          <Route path="*" element={<NotFoundPage />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+      <RouterProvider router={router} />
     </AuthProvider>
   )
 }
