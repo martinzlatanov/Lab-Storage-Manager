@@ -384,6 +384,14 @@ export function ItemDetailPage() {
           <CardHeader
             title="Operation History"
             subtitle={`${itemOps.length} operation${itemOps.length !== 1 ? 's' : ''}`}
+            actions={
+              <Link
+                to={`/items/${item.id}/history`}
+                className="text-xs text-blue-600 hover:text-blue-700 transition-colors"
+              >
+                View full history →
+              </Link>
+            }
           />
           <div className="p-4">
             {itemOps.length === 0 ? (

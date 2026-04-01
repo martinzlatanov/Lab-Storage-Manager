@@ -6,6 +6,23 @@
 
 ---
 
+## [2026-04-01]
+
+### Fixed
+- **BUG-037 — Add Item form now validates required fields client-side** (`frontend/src/pages/items/AddItemPage.tsx`): Added `validate()` function in `AddItemPage` that checks all required fields per item type (OEM, product name, part number, lab ID for electronics; manufacturer, model, type, lab ID for spare parts; etc.) before allowing submission. Missing fields are listed in the error banner; the API is never called with an incomplete form.
+- **BUG-038 — Unsaved-changes warning added to Add Item and Edit Item forms** (`frontend/src/pages/items/AddItemPage.tsx`): Both `AddItemPage` and `EditItemPage` now use `useBlocker` from React Router v6 to intercept in-app navigation when the form is dirty. A `beforeunload` event handler also blocks browser-native navigation (browser back, tab close). A modal confirmation dialog ("Leave page? / Stay / Leave") is shown when navigation is blocked. The blocker is automatically cleared on successful save.
+- **BUG-023/027/028/031/035/036 — All remaining open issues confirmed fixed**: Audited code against each open bug entry. All were already fixed in prior sessions. `saveEdit()` calls PATCH APIs (BUG-023); System Settings save buttons have `onClick` handlers (BUG-027); Export buttons call `downloadCsv()` (BUG-028); Audit log search sends `search` param to API (BUG-031); pagination reads `meta.totalPages` from API (BUG-035); overdue detection uses date-string comparison (BUG-036). BUGS.md open issues section cleared.
+
+### Added
+- **Item Operation History page (ITEM-08)** — new standalone page at `/items/:id/history` accessible to all roles.
+  - `frontend/src/pages/items/ItemOperationHistoryPage.tsx`: filterable, sortable table of all operations for an item with resizable columns (Date/Time, Operation, Performed By, Details). Shows operation badge, timestamp, performer, and type-specific details (location for MOVE/RECEIPT, external location + expected return for TEMP_EXIT, quantity for CONSUME). Includes CSV export.
+  - Operation type dropdown filter (client-side); empty state and loading/error handling.
+  - Supports both mock and API modes using the existing `getItem` + `getItemHistory` calls with the same API mapping as `ItemDetailPage`.
+  - `frontend/src/App.tsx`: updated route `/items/:id/history` to point to `ItemOperationHistoryPage`.
+  - `frontend/src/pages/items/ItemDetailPage.tsx`: "View full history →" link already present in the Operation History card header.
+
+---
+
 ## [2026-03-31]
 
 ### Fixed

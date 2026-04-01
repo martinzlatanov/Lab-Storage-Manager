@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link, useNavigate, useBlocker } from 'react-router-dom'
 import { ArrowLeft, Save, Info, Loader2 } from 'lucide-react'
 import { Card, CardHeader } from '../../components/ui/Card'
 import { FixtureType, FIXTURE_TYPE_LABELS, DEV_PHASE_LABELS, ItemType } from '../../types'
@@ -335,6 +335,7 @@ export function EditItemPage() {
   const [error, setError] = useState('')
   const [fields, setFields] = useState<Record<string, string>>({})
   const [fixtureTypes, setFixtureTypes] = useState<FixtureType[]>([])
+  const [isDirty, setIsDirty] = useState(false)
 
   function populateFields(loaded: AnyItem) {
     const base = { labIdNumber: loaded.labIdNumber, comment: loaded.comment ?? '' }
@@ -385,7 +386,22 @@ export function EditItemPage() {
 
   function setField(name: string, value: string) {
     setFields(prev => ({ ...prev, [name]: value }))
+    setIsDirty(true)
   }
+
+  function handleFixtureTypes(types: FixtureType[]) {
+    setFixtureTypes(types)
+    setIsDirty(true)
+  }
+
+  const blocker = useBlocker(isDirty && !saving && !loading)
+
+  useEffect(() => {
+    if (!isDirty || saving) return
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault() }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [isDirty, saving])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -420,6 +436,7 @@ export function EditItemPage() {
           break
       }
       await updateItem(id, payload)
+      setIsDirty(false)
       navigate(`/items/${id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save changes')
@@ -478,7 +495,7 @@ export function EditItemPage() {
               <p className="text-xs text-slate-400 mt-1 flex items-center gap-1"><Info size={11} />Lab ID cannot be changed after creation</p>
             </div>
             {formType === 'electronics' && <ElectronicsForm fields={fields} setField={setField} />}
-            {formType === 'fixture' && <FixtureForm fields={fields} setField={setField} selectedTypes={fixtureTypes} setSelectedTypes={setFixtureTypes} />}
+            {formType === 'fixture' && <FixtureForm fields={fields} setField={setField} selectedTypes={fixtureTypes} setSelectedTypes={handleFixtureTypes} />}
             {formType === 'sparepart' && <SparePartForm fields={fields} setField={setField} />}
             {formType === 'consumable' && <ConsumableForm fields={fields} setField={setField} />}
             {formType === 'misc' && <MiscForm fields={fields} setField={setField} />}
@@ -501,6 +518,19 @@ export function EditItemPage() {
           </button>
         </div>
       </form>
+
+      {blocker.state === 'blocked' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full mx-4 p-6">
+            <p className="text-sm font-semibold text-slate-800 mb-1">Leave page?</p>
+            <p className="text-sm text-slate-600 mb-4">Your unsaved changes will be lost.</p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => blocker.reset?.()} className="px-4 py-2 border border-slate-200 text-slate-600 text-sm rounded-lg hover:bg-slate-50 transition-colors">Stay</button>
+              <button onClick={() => blocker.proceed?.()} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg transition-colors">Leave</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -556,13 +586,72 @@ export function AddItemPage() {
     : 'electronics'
   const title = FORM_TITLES[formType]
 
+  const isDirty = Object.values(fields).some(Boolean) || fixtureTypes.length > 0 || Boolean(locationId)
+  const blocker = useBlocker(isDirty && !saving)
+
+  useEffect(() => {
+    if (!isDirty || saving) return
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault() }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [isDirty, saving])
+
   function setField(name: string, value: string) {
     setFields(prev => ({ ...prev, [name]: value }))
+  }
+
+  function handleFixtureTypesAdd(types: FixtureType[]) {
+    setFixtureTypes(types)
+  }
+
+  function validate(): string[] {
+    const missing: string[] = []
+    switch (formType) {
+      case 'electronics':
+        if (!fields.oem?.trim()) missing.push('OEM')
+        if (!fields.productType?.trim()) missing.push('Product Type')
+        if (!fields.productName?.trim()) missing.push('Product Name')
+        if (!fields.oemPartNumber?.trim()) missing.push('OEM Part Number')
+        if (!fields.testRequestNumber?.trim()) missing.push('Test Request Number')
+        if (!fields.labIdNumber?.trim()) missing.push('Lab ID Number')
+        break
+      case 'fixture':
+        if (!fields.productName?.trim()) missing.push('Product Name')
+        if (!fields.labIdNumber?.trim()) missing.push('Lab ID Number')
+        if (fixtureTypes.length === 0) missing.push('Fixture Type (select at least one)')
+        break
+      case 'sparepart':
+        if (!fields.manufacturer?.trim()) missing.push('Manufacturer')
+        if (!fields.model?.trim()) missing.push('Model')
+        if (!fields.partType?.trim()) missing.push('Type')
+        if (!fields.labIdNumber?.trim()) missing.push('Lab ID Number')
+        break
+      case 'consumable':
+        if (!fields.manufacturer?.trim()) missing.push('Manufacturer')
+        if (!fields.model?.trim()) missing.push('Model')
+        if (!fields.consumableType?.trim()) missing.push('Type')
+        if (!fields.labIdNumber?.trim()) missing.push('Lab ID Number')
+        if (!fields.quantity || parseFloat(fields.quantity) <= 0) missing.push('Quantity (must be > 0)')
+        if (!fields.unit?.trim()) missing.push('Unit')
+        break
+      case 'misc':
+        if (!fields.miscName?.trim()) missing.push('Name')
+        if (!fields.labIdNumber?.trim()) missing.push('Lab ID Number')
+        break
+    }
+    return missing
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+
+    const missing = validate()
+    if (missing.length > 0) {
+      setError(`Required fields missing: ${missing.join(', ')}`)
+      return
+    }
+
     setSaving(true)
 
     if (USE_MOCKS) {
@@ -672,7 +761,7 @@ export function AddItemPage() {
           <CardHeader title={title} subtitle="Fill in the item information below" />
           <div className="p-4">
             {formType === 'electronics' && <ElectronicsForm fields={fields} setField={setField} />}
-            {formType === 'fixture' && <FixtureForm fields={fields} setField={setField} selectedTypes={fixtureTypes} setSelectedTypes={setFixtureTypes} />}
+            {formType === 'fixture' && <FixtureForm fields={fields} setField={setField} selectedTypes={fixtureTypes} setSelectedTypes={handleFixtureTypesAdd} />}
             {formType === 'sparepart' && <SparePartForm fields={fields} setField={setField} />}
             {formType === 'consumable' && <ConsumableForm fields={fields} setField={setField} />}
             {formType === 'misc' && <MiscForm fields={fields} setField={setField} />}
@@ -721,6 +810,19 @@ export function AddItemPage() {
           </button>
         </div>
       </form>
+
+      {blocker.state === 'blocked' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full mx-4 p-6">
+            <p className="text-sm font-semibold text-slate-800 mb-1">Leave page?</p>
+            <p className="text-sm text-slate-600 mb-4">Your unsaved changes will be lost.</p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => blocker.reset?.()} className="px-4 py-2 border border-slate-200 text-slate-600 text-sm rounded-lg hover:bg-slate-50 transition-colors">Stay</button>
+              <button onClick={() => blocker.proceed?.()} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg transition-colors">Leave</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

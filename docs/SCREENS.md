@@ -140,7 +140,7 @@ App
 
 ---
 
-### ITEM-08 — Item Operation History 🔲
+### ITEM-08 — Item Operation History ✅
 **Route:** `/items/:id/history`
 **Access:** Admin, User, Viewer
 **Description:** Timeline of all operations on the item: receipt, moves, exits, returns, scrap.

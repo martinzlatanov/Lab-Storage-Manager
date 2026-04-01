@@ -29,6 +29,7 @@ import { DashboardPage } from './pages/dashboard/DashboardPage'
 import { ItemListPage } from './pages/items/ItemListPage'
 import { ItemDetailPage } from './pages/items/ItemDetailPage'
 import { AddItemPage, EditItemPage } from './pages/items/AddItemPage'
+import { ItemOperationHistoryPage } from './pages/items/ItemOperationHistoryPage'
 import {
   ReceiptPage,
   MovePage,
@@ -108,6 +109,7 @@ export default function App() {
           <Route path="/items" element={<ItemListPage />} />
           <Route path="/items/new/:type" element={<AddItemPage />} />
           <Route path="/items/:id/edit" element={<EditItemPage />} />
+          <Route path="/items/:id/history" element={<ItemOperationHistoryPage />} />
           <Route path="/items/:id" element={<ItemDetailPage />} />
 
           {/* Operations */}
