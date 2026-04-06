@@ -478,7 +478,7 @@ export function ExpiryReportPage() {
                   : apiItems.map(i => {
                       const days = i.daysUntilExpiry
                       const daysLabel = days === null || days === undefined ? 'No expiry' : days < 0 ? 'Expired' : `${days}d`
-                      return [i.labIdNumber, i.consumableType ?? '', String(i.quantity), i.unit, i.lotNumber ?? '', i.expiryDate ? formatDate(i.expiryDate) : '', daysLabel, i.location?.label ?? i.container?.label ?? '']
+                      return [i.labIdNumber, i.consumableType ?? '', String(i.quantity), i.unit ?? '', i.lotNumber ?? '', i.expiryDate ? formatDate(i.expiryDate) : '', daysLabel, i.location?.label ?? i.container?.label ?? '']
                     })
                 downloadCsv([header, ...rows], `expiry-report-${todayStr()}.csv`)
               }}
