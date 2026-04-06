@@ -6,7 +6,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { UserRole, type StorageArea } from '../../types'
+import { UserRole } from '../../types'
 import {
   ChevronRight,
   MapPin,
