@@ -374,7 +374,7 @@ export function ExpiryReportPage() {
   const [loading, setLoading] = useState(!USE_MOCKS)
   const [error, setError] = useState('')
   const [apiItems, setApiItems] = useState<ExpiryReportItem[]>([])
-  const [colWidths, setColWidths] = useState([90, 160, 90, 110, 110, 80, 140])
+  const [colWidths, setColWidths] = useState([90, 160, 90, 70, 110, 110, 80, 140])
   const resizeRef = useRef<{ col: number; startX: number; startWidth: number } | null>(null)
   useEffect(() => {
     function onMouseMove(e: MouseEvent) {
@@ -501,7 +501,7 @@ export function ExpiryReportPage() {
               <colgroup>{colWidths.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
               <thead>
                 <tr className="border-b border-slate-100 text-left">
-                  {(['Lab ID', 'Type', 'Quantity', 'Lot #', 'Expiry Date', 'Days Left', 'Location'] as const).map((label, i) => (
+                  {(['Lab ID', 'Type', 'Quantity', 'Unit', 'Lot #', 'Expiry Date', 'Days Left', 'Location'] as const).map((label, i) => (
                     <th key={i} className="relative px-3 py-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wide select-none overflow-hidden whitespace-nowrap">
                       <span className="block overflow-hidden">{label}</span>
                       <div className="absolute right-0 top-0 h-full w-2 cursor-col-resize flex items-center justify-center group/handle" onMouseDown={e => { e.preventDefault(); resizeRef.current = { col: i, startX: e.clientX, startWidth: colWidths[i] }; document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none' }}>
@@ -524,9 +524,10 @@ export function ExpiryReportPage() {
                         <td className="px-3 py-1 overflow-hidden whitespace-nowrap text-slate-700">{c.consumableType}</td>
                         <td className="px-3 py-1 overflow-hidden whitespace-nowrap">
                           <span className={clsx('font-medium', c.status === ItemStatus.DEPLETED ? 'text-slate-400 line-through' : 'text-slate-800')}>
-                            {c.quantity} {c.unit}
+                            {c.quantity}
                           </span>
                         </td>
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap text-slate-500 text-xs">{c.unit}</td>
                         <td className="px-3 py-1 overflow-hidden whitespace-nowrap text-slate-500 font-mono text-xs">{c.lotNumber ?? '—'}</td>
                         <td className="px-3 py-1 overflow-hidden whitespace-nowrap text-slate-600">{c.expiryDate ? formatDate(c.expiryDate) : '—'}</td>
                         <td className={clsx('px-3 py-1 overflow-hidden whitespace-nowrap font-semibold', color)}>{label}</td>
@@ -547,9 +548,10 @@ export function ExpiryReportPage() {
                         <td className="px-3 py-1 overflow-hidden whitespace-nowrap text-slate-700">{item.consumableType ?? '—'}</td>
                         <td className="px-3 py-1 overflow-hidden whitespace-nowrap">
                           <span className={clsx('font-medium', item.status === ItemStatus.DEPLETED ? 'text-slate-400 line-through' : 'text-slate-800')}>
-                            {item.quantity} {item.unit}
+                            {item.quantity}
                           </span>
                         </td>
+                        <td className="px-3 py-1 overflow-hidden whitespace-nowrap text-slate-500 text-xs">{item.unit ?? '—'}</td>
                         <td className="px-3 py-1 overflow-hidden whitespace-nowrap text-slate-500 font-mono text-xs">{item.lotNumber ?? '—'}</td>
                         <td className="px-3 py-1 overflow-hidden whitespace-nowrap text-slate-600">{item.expiryDate ? formatDate(item.expiryDate) : '—'}</td>
                         <td className={clsx('px-3 py-1 overflow-hidden whitespace-nowrap font-semibold', getApiExpiryColor(days))}>

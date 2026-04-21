@@ -12,7 +12,7 @@ import { MOCK_ITEMS, MOCK_CONTAINERS, MOCK_EXTERNAL_LOCATIONS, MOCK_SITES } from
 import { ItemType, ItemStatus } from '../../types'
 import type { AnyItem } from '../../types'
 import {
-  getItems, getLocationsFlat, getContainers, getExternalLocations,
+  getItems, getItem, getLocationsFlat, getContainers, getExternalLocations,
   recordReceipt, recordMove, recordExit, recordReturn, recordScrap, recordConsume,
 } from '../../api'
 import clsx from 'clsx'
@@ -351,7 +351,7 @@ export function ReceiptPage() {
                   Back
                 </button>
               ) : <div />}
-              <button type="submit" disabled={submitting}
+              <button type="submit" disabled={submitting || (step === 2 && !locationId && !containerId)}
                 className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-medium px-4 py-1.5 rounded-lg transition-colors">
                 {submitting ? <><Loader2 size={14} className="animate-spin" /> Processing…</> : step < 3 ? 'Continue →' : 'Confirm Receipt'}
               </button>
@@ -390,11 +390,9 @@ export function MovePage() {
       setSelectedItem(MOCK_ITEMS.find(i => i.id === id) ?? null)
       return
     }
-    import('../../api').then(api => {
-      api.getItem(id)
-        .then(r => setSelectedItem(r.data))
-        .catch(() => { setSelectedItemId(''); setError('Failed to load item details — please try again') })
-    })
+    getItem(id)
+      .then(r => setSelectedItem(r.data))
+      .catch(() => { setSelectedItemId(''); setError('Failed to load item details — please try again') })
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -517,6 +515,7 @@ export function MovePage() {
 
 export function ExitPage() {
   const [selectedItemId, setSelectedItemId] = useState('')
+  const [selectedItem, setSelectedItem] = useState<AnyItem | null>(null)
   const [externalLocationId, setExternalLocationId] = useState('')
   const [expectedReturnDate, setExpectedReturnDate] = useState('')
   const [notes, setNotes] = useState('')
@@ -524,6 +523,17 @@ export function ExitPage() {
   const [error, setError] = useState('')
   const navigate = useNavigate()
   const externalOptions = useExternalLocations()
+
+  function handleSelectItem(id: string) {
+    setSelectedItemId(id)
+    if (USE_MOCKS) {
+      setSelectedItem(MOCK_ITEMS.find(i => i.id === id) ?? null)
+      return
+    }
+    getItem(id)
+      .then(r => setSelectedItem(r.data))
+      .catch(() => { setSelectedItemId(''); setError('Failed to load item details — please try again') })
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -565,7 +575,26 @@ export function ExitPage() {
         <form onSubmit={handleSubmit} className="p-4 space-y-3">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Item <span className="text-red-500">*</span></label>
-            <ItemSearchBox onSelect={setSelectedItemId} />
+            {selectedItem ? (
+              <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-mono text-sm font-medium text-slate-800">{selectedItem.labIdNumber}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <ItemTypeBadge type={selectedItem.itemType} />
+                      <ItemStatusBadge status={selectedItem.status} />
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1.5">Current location: {getItemLocation(selectedItem as Record<string, unknown>)}</p>
+                  </div>
+                  <button type="button" onClick={() => { setSelectedItemId(''); setSelectedItem(null) }}
+                    className="text-xs text-blue-600 hover:text-blue-800 shrink-0">
+                    Change
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <ItemSearchBox onSelect={handleSelectItem} />
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">External Location <span className="text-red-500">*</span></label>
@@ -586,7 +615,7 @@ export function ExitPage() {
           </div>
           <div className="flex justify-end gap-3 pt-1">
             <button type="button" onClick={() => navigate(-1)} className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm text-slate-700 hover:bg-slate-50">Cancel</button>
-            <button type="submit" disabled={submitting || !selectedItemId || !externalLocationId}
+            <button type="submit" disabled={submitting || !selectedItem || !externalLocationId}
               className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 disabled:opacity-60 text-white text-sm font-medium px-4 py-1.5 rounded-lg transition-colors">
               {submitting ? <><Loader2 size={14} className="animate-spin" /> Processing…</> : 'Confirm Exit'}
             </button>
@@ -617,11 +646,9 @@ export function ReturnPage() {
       setSelectedItem(MOCK_ITEMS.find(i => i.id === id) ?? null)
       return
     }
-    import('../../api').then(api => {
-      api.getItem(id)
-        .then(r => setSelectedItem(r.data))
-        .catch(() => { setSelectedItemId(''); setError('Failed to load item details — please try again') })
-    })
+    getItem(id)
+      .then(r => setSelectedItem(r.data))
+      .catch(() => { setSelectedItemId(''); setError('Failed to load item details — please try again') })
   }
 
   const todayDate = new Date().toLocaleDateString('en-CA')
@@ -748,9 +775,7 @@ export function ScrapPage() {
       setSelectedItem(MOCK_ITEMS.find(i => i.id === id) ?? null)
       return
     }
-    import('../../api').then(api => {
-      api.getItem(id).then(r => setSelectedItem(r.data)).catch(() => {})
-    })
+    getItem(id).then(r => setSelectedItem(r.data)).catch(() => {})
   }
 
   const asAny = selectedItem as Record<string, unknown> | null
@@ -805,6 +830,16 @@ export function ScrapPage() {
             </div>
           )}
 
+          {selectedItem?.status === ItemStatus.DEPLETED && (
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 flex items-start gap-3">
+              <AlertTriangle size={16} className="text-orange-500 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-orange-800">Item is already depleted</p>
+                <p className="text-sm text-orange-700">This consumable has zero remaining stock. You are scrapping an empty container or spent material — confirm this is intentional.</p>
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Reason for Scrap <span className="text-red-500">*</span></label>
             <textarea rows={3} value={scrapReason} onChange={e => setScrapReason(e.target.value)} className={clsx(inputClass, 'resize-none')} placeholder="Describe the reason for scrapping (damage, EOL, failed test…)" />
@@ -853,7 +888,7 @@ export function ConsumePage() {
   const [error, setError] = useState('')
   const [consumables, setConsumables] = useState<AnyItem[]>(
     USE_MOCKS
-      ? MOCK_ITEMS.filter(i => i.itemType === ItemType.CONSUMABLE && i.status !== ItemStatus.DEPLETED)
+      ? MOCK_ITEMS.filter(i => i.itemType === ItemType.CONSUMABLE && i.status !== ItemStatus.DEPLETED && i.status !== ItemStatus.TEMP_EXIT)
       : [],
   )
   const navigate = useNavigate()
@@ -861,7 +896,7 @@ export function ConsumePage() {
   useEffect(() => {
     if (USE_MOCKS) return
     getItems({ itemType: ItemType.CONSUMABLE, pageSize: 100 })
-      .then(r => setConsumables(r.data.filter(i => i.status !== ItemStatus.DEPLETED)))
+      .then(r => setConsumables(r.data.filter(i => i.status !== ItemStatus.DEPLETED && i.status !== ItemStatus.TEMP_EXIT)))
       .catch(() => {})
   }, [])
 

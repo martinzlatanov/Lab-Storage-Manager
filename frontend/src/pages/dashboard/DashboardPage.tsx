@@ -229,7 +229,7 @@ export function DashboardPage() {
             <div>
               <p className="text-slate-500 text-xs font-medium uppercase tracking-widest">Recent Ops</p>
               <p className="text-3xl font-bold text-blue-600 mt-2 font-mono">{stats.recentOps.length}</p>
-              <p className="text-slate-400 text-xs mt-1.5">this week</p>
+              <p className="text-slate-400 text-xs mt-1.5">last 6 operations</p>
             </div>
             <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
               <ArrowRightLeft size={16} className="text-blue-600" />

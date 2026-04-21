@@ -36,7 +36,10 @@ const ReturnBody = z.object({
   toLocationId: z.string().optional(),
   toContainerId: z.string().optional(),
   notes: z.string().optional(),
-});
+}).refine(
+  (d) => d.toLocationId || d.toContainerId,
+  { message: "At least one of toLocationId or toContainerId must be provided" }
+);
 
 const ScrapBody = z.object({
   itemId: z.string().min(1),
@@ -134,6 +137,9 @@ export default async function operationsRoutes(app: FastifyInstance) {
       if (!item) return reply.status(404).send({ success: false, error: "Item not found" });
       if (item.status === "SCRAPPED") {
         return reply.status(409).send({ success: false, error: "Cannot operate on a scrapped item" });
+      }
+      if (item.status === "DEPLETED") {
+        return reply.status(409).send({ success: false, error: "Cannot re-receive a depleted consumable — create a new item for new stock" });
       }
 
       if (locationId) {
@@ -350,6 +356,9 @@ export default async function operationsRoutes(app: FastifyInstance) {
       if (item.status === "SCRAPPED") {
         return reply.status(409).send({ success: false, error: "Item is already scrapped" });
       }
+      if (item.status === "TEMP_EXIT") {
+        return reply.status(409).send({ success: false, error: "Item is currently at an external location — record a return before scrapping" });
+      }
 
       const [operation] = await prisma.$transaction([
         prisma.operationRecord.create({
@@ -392,6 +401,9 @@ export default async function operationsRoutes(app: FastifyInstance) {
       }
       if (item.status === "SCRAPPED" || item.status === "DEPLETED") {
         return reply.status(409).send({ success: false, error: "Item is no longer available" });
+      }
+      if (item.status === "TEMP_EXIT") {
+        return reply.status(409).send({ success: false, error: "Item is currently at an external location — record a return before consuming" });
       }
 
       const currentQty = item.quantity ?? 0;

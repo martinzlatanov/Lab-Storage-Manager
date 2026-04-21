@@ -6,6 +6,53 @@
 
 ---
 
+## [2026-04-15]
+
+### Fixed
+
+- **BUG-001 — CONSUME now blocks items in TEMP_EXIT status** (`backend/src/routes/operations.ts`): Added `TEMP_EXIT` to the status guard in the CONSUME handler. A consumable that is currently at an external location can no longer have its stock reduced locally, preventing inventory discrepancy.
+
+- **BUG-002 — RETURN now requires a destination** (`backend/src/routes/operations.ts`): Added `.refine()` to the `ReturnBody` Zod schema requiring at least one of `toLocationId` or `toContainerId`. Returning an item without a known location now returns 400, enforcing the spec rule that all parts locations must be known.
+
+- **BUG-003 — RECEIPT now blocks DEPLETED consumables** (`backend/src/routes/operations.ts`): Added a `DEPLETED` status check in the RECEIPT handler. Re-receiving a depleted consumable (which has quantity 0) now returns 409 — operators must create a new item for new stock, preventing ghost inventory entries with zero quantity.
+
+- **BUG-005 — Expiry report `includeExpired` filter now works** (`backend/src/routes/reports.ts`): Replaced `gte: undefined` (a Prisma no-op) with `gte: now` when `includeExpired !== "true"`. The filter now correctly excludes expired consumables from the default report view.
+
+- **BUG-009 — SCRAP now blocks items in TEMP_EXIT status** (`backend/src/routes/operations.ts`): Added `TEMP_EXIT` guard in the SCRAP handler. Items currently at external locations cannot be scrapped directly — a RETURN must be recorded first, preserving the required audit trail sequence (TEMP_EXIT → RETURN → SCRAP).
+
+- **BUG-006 — ConsumePage excludes TEMP_EXIT consumables** (`frontend/src/pages/operations/OperationsPages.tsx`): Added `TEMP_EXIT` status filter alongside the existing `DEPLETED` filter in the ConsumePage dropdown, for both mock and API data paths. Consumables physically at external locations no longer appear in the consume form.
+
+- **BUG-007 — Expiry table now shows Unit column** (`frontend/src/pages/reports/ReportsPages.tsx`): Added `'Unit'` column header, a 70px colgroup entry, and split the combined Quantity+Unit cell into separate Quantity and Unit cells. Table now matches the 8-column CSV export.
+
+- **BUG-008 — Dashboard Recent Ops card label corrected** (`frontend/src/pages/dashboard/DashboardPage.tsx`): Changed "this week" to "last 6 operations" — the card fetches the 6 most recent operations with no date filter, so the previous label was misleading.
+
+- **BUG-010 — ReceiptPage Step 2 continue button now enforces location selection** (`frontend/src/pages/operations/OperationsPages.tsx`): Added `(step === 2 && !locationId && !containerId)` guard to the submit button's `disabled` prop. The "Continue →" button is disabled until at least one destination is chosen.
+
+- **BUG-011 — ExitPage now shows item detail card after selection** (`frontend/src/pages/operations/OperationsPages.tsx`): Added `selectedItem` state and `handleSelectItem` function to `ExitPage` (matching the `MovePage`/`ReturnPage` pattern). After scan/search, a detail card showing lab ID, type, status, and current location is rendered. Submit is gated on item being loaded.
+
+- **BUG-012 — ScrapPage warns when scrapping a DEPLETED item** (`frontend/src/pages/operations/OperationsPages.tsx`): Added an amber warning banner that renders when the selected item has `DEPLETED` status, alerting the operator they are scrapping an empty container or spent consumable.
+
+- **BUG-015 — Mock container c5 invalid state fixed** (`frontend/src/mock/data.ts`): Removed `storageAreaId` and `storageAreaCode` from container `c5`. A container at an external location must not carry a storage area assignment.
+
+### Decided
+
+- **BUG-004 closed as invalid**: The `Item` model has no `storageAreaId` field — storage area is derived relationally through `location.storageArea`. The MOVE handler correctly updates `locationId` and `containerId`. No code change required.
+
+- **BUG-013 closed as already fixed**: PATCH rename endpoints for sites, buildings, and areas (`PATCH /sites/:siteId`, `PATCH /buildings/:buildingId`, `PATCH /areas/:areaId`) were implemented in the 2026-03-31 session (`backend/src/routes/sites.ts:483–580`). Bug was already resolved.
+
+---
+
+## [2026-04-08]
+
+### Fixed
+- **Vite build warning: mixed static/dynamic imports** (`frontend/src/pages/operations/OperationsPages.tsx`):
+  - Removed 3 redundant dynamic `import('../../api')` calls in `handleSelectItem()` functions (MovePageFunctions, ReturnPage, ScrapPage).
+  - Added `getItem` to the static import statement at the top of the file.
+  - This resolves the Vite warning about module being "dynamically imported by X but also statically imported by Y" which was preventing proper code splitting.
+  - Bundle size slightly reduced from 513 KB to 510.54 KB (gzipped).
+
+---
+
 ## [2026-04-01]
 
 ### Changed

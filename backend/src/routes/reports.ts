@@ -190,7 +190,7 @@ export default async function reportsRoutes(app: FastifyInstance) {
           status: { notIn: includeExpired === "true" ? ["SCRAPPED"] : ["SCRAPPED", "DEPLETED"] },
           expiryDate: {
             not: null,
-            ...(includeExpired !== "true" ? { gte: undefined } : {}),
+            ...(includeExpired !== "true" ? { gte: now } : {}),
             ...(dateCeiling ? { lte: dateCeiling } : {}),
           },
           ...locationFilter,
